@@ -1,8 +1,10 @@
-import { MdManageHistory, MdFolderSpecial } from "react-icons/md";
 import { FiHome, FiFolder, FiClock, FiCode, FiBox } from "react-icons/fi";
+import { MdManageHistory, MdFolderSpecial, MdMarkChatUnread } from 'react-icons/md'; // <-- NEW ICON IMPORT
 
 export const navItems = [
   { text: "Home", href: "/", defaultIcon: FiHome },
+  { text: "Chat", href: "/chat", defaultIcon: MdMarkChatUnread },
+
   {
     text: "Repos",
     href: "/repos",

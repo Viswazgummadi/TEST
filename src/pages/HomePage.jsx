@@ -1,83 +1,82 @@
+// src/pages/HomePage.jsx
+
 import { motion } from "framer-motion";
 import FeatureSection from "../components/FeatureSection";
-import { useAdmin } from "../context/AdminContext";
+import Logo from "../components/Logo";
 
-const featureData = [
+// This data should be defined here or imported.
+const features = [
   {
-    title: "Intuitive Chat Interface",
+    id: 1,
+    title: "Seamless Repository Integration",
     description:
-      "Engage with a seamless and intelligent chat UI. Powered by a robust backend, it provides instant, context-aware responses.",
-    image: "/feature1.png",
-    layout: "image-left",
+      "Connect your GitHub repositories in seconds. Reploit intelligently scans and indexes your codebase, building a semantic understanding of your project architecture.",
+    imageUrl: "/feature1.png",
   },
   {
-    title: "Advanced History Management",
+    id: 2,
+    title: "Natural Language Queries",
     description:
-      "Never lose track of your progress. Our history management system provides a clear, chronological view of your past interactions.",
-    image: "/feature2.png",
-    layout: "image-right",
+      'Ask questions in plain English. No need to remember complex syntax or file names. "How does our authentication middleware handle token refreshing?"',
+    imageUrl: "/feature2.png",
   },
   {
-    title: "Dynamic Flow Visualization",
+    id: 3,
+    title: "Context-Aware Responses",
     description:
-      "Understand your application architecture at a glance. The flow view provides a beautiful, interactive diagram of your components.",
-    image: "/feature3.png",
-    layout: "image-left",
+      "Leveraging Retrieval-Augmented Generation (RAG), Reploit provides answers based on the specific context of YOUR code, ensuring relevance and accuracy.",
+    imageUrl: "/feature3.png",
   },
   {
-    title: "One-Click Deployment",
+    id: 4,
+    title: "Code-Level Insight",
     description:
-      "From development to production in a single click. Our streamlined deployment process integrates directly with your workflow.",
-    image: "/feature4.png",
-    layout: "image-right",
+      "Go beyond simple text search. Reploit understands functions, classes, and variable relationships, allowing for deeper insights and faster debugging.",
+    imageUrl: "/feature4.png",
   },
 ];
 
-const pageVariants = {
-  initial: (direction) =>
-    direction !== 0 ? { opacity: 0, y: direction * 50 } : { opacity: 0 },
-  animate: { opacity: 1, y: 0 },
-  exit: (direction) =>
-    direction !== 0 ? { opacity: 0, y: direction * -50 } : { opacity: 0 },
-};
-
 const HomePage = () => {
-  const { isAdmin } = useAdmin();
-  const heroGradientClass = isAdmin
-    ? "from-red-400 via-red-500 to-red-400"
-    : "from-gray-200 via-cyan-300 to-gray-200";
-
   return (
+    // --- LAYOUT CLASS CORRECTED ---
+    // Removed conflicting max-width and padding classes to rely on the main App.jsx layout.
     <motion.div
-      variants={pageVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      transition={{ type: "tween", ease: "circOut", duration: 0.5 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="w-full"
     >
-      <section className="text-center mb-24 md:mb-32">
-        <motion.h1
-          key={isAdmin ? "admin-title" : "user-title"}
+      <div className="text-center py-16 md:py-24">
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          className={`text-4xl md:text-6xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r pb-2 ${heroGradientClass}`}
+          transition={{ duration: 0.7, ease: "easeOut" }}
         >
-          Welcome to REPLOIT
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          className="mt-4 max-w-2xl mx-auto text-lg text-gray-400"
-        >
-          The ultimate platform for building, testing, and deploying
-          next-generation applications with ease and precision.
-        </motion.p>
-      </section>
-      <div className="space-y-24 md:space-y-32">
-        {featureData.map((feature, index) => (
-          <FeatureSection key={index} {...feature} />
+          <div className="inline-block" style={{ transform: "scale(1.5)" }}>
+            <Logo />
+          </div>
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-100 mt-6">
+            Understand Your Codebase. Instantly.
+          </h1>
+          <p className="mt-6 text-lg text-gray-400 max-w-3xl mx-auto">
+            Reploit is a semantic, context-aware code search engine that uses AI
+            to provide deep insights into your repositories. Ask questions in
+            natural language and get answers based on your actual code.
+          </p>
+        </motion.div>
+      </div>
+
+      <div className="space-y-20 md:space-y-28 py-16">
+        {features.map((feature, index) => (
+          <FeatureSection
+            key={feature.id}
+            title={feature.title}
+            description={feature.description}
+            imageUrl={feature.imageUrl}
+            // --- CRITICAL FIX ---
+            // Explicitly set reverse to false to ensure the homepage layout is uniform.
+            reverse={false}
+          />
         ))}
       </div>
     </motion.div>

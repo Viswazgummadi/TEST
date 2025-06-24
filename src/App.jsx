@@ -9,9 +9,13 @@ import { navItems } from "./navigation.js";
 import HomePage from "./pages/HomePage";
 import ReposPage from "./pages/ReposPage";
 import HistoryPage from "./pages/HistoryPage";
+import ImplementationPage from "./pages/ImplementationPage";
+import DeploymentPage from "./pages/DeploymentPage";
+import ChatPage from "./pages/ChatPage";
 import Sidebar from "./components/Sidebar";
 import UniversalHeader from "./components/UniversalHeader";
 
+// --- THIS IS THE ONE AND ONLY DECLARATION ---
 function useNavigationDirection() {
   const { pathname } = useLocation();
   const prevPathRef = useRef(pathname);
@@ -22,12 +26,13 @@ function useNavigationDirection() {
     navItems.findIndex((item) => item.href === path || item.adminHref === path);
   const prevIndex = findIndex(prevPathRef.current);
   const currentIndex = findIndex(pathname);
-  if (prevIndex > 0 && currentIndex > 0) {
+  if (prevIndex !== -1 && currentIndex !== -1 && prevIndex !== currentIndex) {
     if (currentIndex > prevIndex) return 1; // Down
     if (currentIndex < prevIndex) return -1; // Up
   }
-  return 0;
+  return 0; // Default to fade
 }
+// ---------------------------------------------
 
 function AppRoutes({ sourceFilter, repoFilter }) {
   const location = useLocation();
@@ -36,6 +41,9 @@ function AppRoutes({ sourceFilter, repoFilter }) {
     <AnimatePresence mode="wait" custom={direction}>
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/implementation" element={<ImplementationPage />} />
+        <Route path="/deployment" element={<DeploymentPage />} />
+        <Route path="/chat" element={<ChatPage />} />
         <Route
           path="/repos"
           element={<ReposPage sourceFilter={sourceFilter} />}
@@ -54,31 +62,20 @@ function AppRoutes({ sourceFilter, repoFilter }) {
 }
 
 function AppContent() {
-  const { pathname } = useLocation();
-  const isHomePage = pathname === "/";
-
-  // State for the Repos page source filter
   const [sourceFilter, setSourceFilter] = useState("all");
-  // State for the History page repo filter
   const [repoFilter, setRepoFilter] = useState("all");
 
   return (
     <div className="flex min-h-screen bg-stone-950 text-gray-200">
-      <AnimatePresence>
-        {!isHomePage && <Sidebar key="sidebar" />}
-      </AnimatePresence>
-      <motion.div
-        className="flex-1 flex flex-col"
-        animate={{ paddingLeft: isHomePage ? "0rem" : "7rem" }}
-        transition={{ type: "spring", damping: 20, stiffness: 100 }}
-      >
+      <Sidebar />
+      <div className="flex-1 flex flex-col" style={{ paddingLeft: "72px" }}>
         <UniversalHeader
           sourceFilter={sourceFilter}
           onSourceChange={setSourceFilter}
           repoFilter={repoFilter}
           onRepoChange={setRepoFilter}
         />
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <AppRoutes sourceFilter={sourceFilter} repoFilter={repoFilter} />
         </main>
         <motion.footer
@@ -89,7 +86,7 @@ function AppContent() {
         >
           <p>© {new Date().getFullYear()} REPLOIT. All rights reserved.</p>
         </motion.footer>
-      </motion.div>
+      </div>
     </div>
   );
 }

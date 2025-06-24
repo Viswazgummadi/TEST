@@ -1,40 +1,45 @@
+// src/components/FeatureSection.jsx
+
 import { motion } from "framer-motion";
-import FeatureCard from "./FeatureCard";
 
-const FeatureSection = ({ title, description, image, layout }) => {
-  const isImageLeft = layout === "image-left";
-
-  const sectionVariants = {
-    hidden: { opacity: 0, y: 50 },
+const FeatureSection = ({ title, description, imageUrl, reverse = false }) => {
+  const containerVariants = {
+    hidden: { opacity: 0, y: 40 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.8, ease: "easeOut" },
+      // --- ANIMATION TIMING CORRECTED ---
+      transition: { duration: 0.45, ease: "circOut" },
     },
   };
 
+  const textDirectionClass = reverse ? "md:text-right" : "md:text-left";
+  const flexDirectionClass = reverse ? "md:flex-row-reverse" : "md:flex-row";
+
   return (
-    <motion.section
-      className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 items-center"
+    <motion.div
+      variants={containerVariants}
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, amount: 0.3 }}
-      variants={sectionVariants}
+      className={`flex flex-col ${flexDirectionClass} items-center gap-8 md:gap-16`}
     >
-      <div className={`order-2 ${isImageLeft ? "md:order-1" : "md:order-2"}`}>
-        <FeatureCard imageSrc={image} />
-      </div>
       <div
-        className={`order-1 ${
-          isImageLeft ? "md:order-2" : "md:order-1"
-        } text-center md:text-left`}
+        className={`w-full md:w-1/2 flex flex-col justify-center ${textDirectionClass}`}
       >
-        <h2 className="text-3xl font-bold tracking-tight text-gray-100 mb-4">
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-100 mb-4">
           {title}
         </h2>
-        <p className="text-lg text-gray-400 leading-relaxed">{description}</p>
+        <p className="text-gray-400 leading-relaxed">{description}</p>
       </div>
-    </motion.section>
+      <div className="w-full md:w-1/2">
+        <img
+          src={imageUrl}
+          alt={title}
+          className="w-full h-auto rounded-xl shadow-2xl shadow-black/30 object-cover"
+        />
+      </div>
+    </motion.div>
   );
 };
 
