@@ -1,5 +1,3 @@
-// src/components/Sidebar.jsx
-
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
@@ -25,8 +23,11 @@ const Sidebar = () => {
   const { pathname } = useLocation();
 
   return (
+    // --- THIS IS THE UPDATED LINE ---
+    // bg-black/30 -> bg-black/20 (more transparent)
+    // backdrop-blur-lg -> backdrop-blur-xl (stronger blur)
     <motion.div
-      className="fixed top-[16px] left-[16px] bottom-[16px] bg-black/30 backdrop-blur-lg border border-white/10 z-50 flex flex-col py-3 px-2 rounded-xl"
+      className="fixed top-[16px] left-[16px] bottom-[16px] bg-black/20 backdrop-blur-xl border border-white/10 z-50 flex flex-col py-3 px-2 rounded-xl"
       variants={sidebarVariants}
       initial="collapsed"
       animate={isExpanded ? "expanded" : "collapsed"}
@@ -68,44 +69,29 @@ const Sidebar = () => {
 
       <nav className="flex-1 flex flex-col space-y-1">
         {navItems.map((item) => {
-          // --- THIS IS THE FULLY CORRECTED LOGIC ---
-
-          // 1. Determine the link's destination based on admin mode.
           const targetHref =
             isAdmin && item.adminHref ? item.adminHref : item.href;
-
-          // 2. Determine the icon based on admin mode.
           const IconToRender =
             isAdmin && item.adminIcon ? item.adminIcon : item.defaultIcon;
-
-          // 3. Determine if the link is "active" by checking against BOTH possible paths.
           const isActive =
             pathname === item.href ||
             (item.adminHref && pathname === item.adminHref);
-
           let linkClass = "";
           if (isAdmin) {
-            // If in Admin Mode, the theme is ALWAYS red.
             if (isActive) {
-              // Active link styling in Admin Mode.
               linkClass = "bg-red-500/20 text-red-400";
             } else {
-              // Inactive link styling in Admin Mode.
               linkClass =
                 "text-gray-400 hover:bg-red-500/20 hover:text-red-400";
             }
           } else {
-            // If in Normal Mode, the theme is ALWAYS cyan.
             if (isActive) {
-              // Active link styling in Normal Mode.
               linkClass = "bg-cyan-400/20 text-cyan-300";
             } else {
-              // Inactive link styling in Normal Mode.
               linkClass =
                 "text-gray-400 hover:bg-cyan-400/20 hover:text-cyan-300";
             }
           }
-          // --- END CORRECTION ---
 
           return (
             <Link
@@ -144,7 +130,6 @@ const Sidebar = () => {
         })}
       </nav>
 
-      {/* ADMIN MODE BUTTON */}
       <button
         onClick={() => setIsAdmin((prev) => !prev)}
         title="Admin Mode"

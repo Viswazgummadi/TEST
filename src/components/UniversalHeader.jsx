@@ -1,5 +1,3 @@
-// src/components/UniversalHeader.jsx
-
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, Link } from "react-router-dom";
 import { useAdmin } from "../context/AdminContext";
@@ -16,10 +14,12 @@ const repoSourceOptions = [
   { id: "drive", name: "Google Drive", icon: SiGoogledrive },
 ];
 
-const repoFilterOptions = [
-  { id: "all", name: "All Repositories", icon: FiBox },
-  ...mockRepos.map((repo) => ({ ...repo, icon: FiFolder })),
-];
+const repoFilterOptions = mockRepos.map((repo) => ({
+  ...repo,
+  icon: FiFolder,
+}));
+
+// ... (HomeControls and AppControls are unchanged) ...
 
 const HomeControls = () => {
   const { isAdmin } = useAdmin();
@@ -101,9 +101,7 @@ const AppControls = ({ selectorProps }) => {
 const UniversalHeader = (props) => {
   const { pathname } = useLocation();
 
-  // --- UPDATE THIS LIST ---
   const appStylePages = ["/repos", "/history", "/admin/history", "/chat"];
-  // ------------------------
   const isAppStyleHeader = appStylePages.some((page) =>
     pathname.startsWith(page)
   );
@@ -115,7 +113,6 @@ const UniversalHeader = (props) => {
       selectedValue: props.sourceFilter,
       onChange: props.onSourceChange,
     };
-    // --- ADD THIS CONDITION ---
   } else if (
     pathname.startsWith("/chat") ||
     ["/history", "/admin/history"].includes(pathname)
@@ -126,38 +123,44 @@ const UniversalHeader = (props) => {
       onChange: props.onRepoChange,
     };
   }
-  // --------------------------
 
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between h-16 px-8 bg-stone-950/80 backdrop-blur-lg border-b border-white/5">
-      <motion.div layoutId="app-logo-container">
-        <Logo />
-      </motion.div>
-      <motion.div>
-        <AnimatePresence mode="wait">
-          {isAppStyleHeader ? (
-            <motion.div
-              key="app"
-              initial={{ opacity: 0, x: -25 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 25 }}
-              transition={{ type: "tween", duration: 0.3, ease: "easeInOut" }}
-            >
-              <AppControls selectorProps={selectorProps} />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0, x: 25 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -25 }}
-              transition={{ type: "tween", duration: 0.35, ease: "easeInOut" }}
-            >
-              <HomeControls />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+    <header className="sticky top-0 z-40 p-3">
+      {/* --- THE CHANGE IS HERE --- */}
+      <div className="flex items-center justify-between h-14 px-6 bg-black/20 backdrop-blur-xl border border-white/10 rounded-xl">
+        <motion.div layoutId="app-logo-container">
+          <Logo />
+        </motion.div>
+        <motion.div>
+          <AnimatePresence mode="wait">
+            {isAppStyleHeader ? (
+              <motion.div
+                key="app"
+                initial={{ opacity: 0, x: -25 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 25 }}
+                transition={{ type: "tween", duration: 0.3, ease: "easeInOut" }}
+              >
+                <AppControls selectorProps={selectorProps} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="home"
+                initial={{ opacity: 0, x: 25 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -25 }}
+                transition={{
+                  type: "tween",
+                  duration: 0.35,
+                  ease: "easeInOut",
+                }}
+              >
+                <HomeControls />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
     </header>
   );
 };

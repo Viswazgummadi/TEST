@@ -2,22 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #0c0a09;
-  color: #f2f2f2;
-  overflow-x: hidden;
-}
-
+/* 
+  Adds custom, translucent scrollbar styling.
+  This works in WebKit-based browsers (Chrome, Safari, Edge, etc.).
+*/
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
+
+/* The track (the area the scrollbar moves in) */
 ::-webkit-scrollbar-track {
-  background: #1c1917;
+  background: transparent;
 }
+
+/* The draggable handle of the scrollbar */
 ::-webkit-scrollbar-thumb {
-  background: #44403c;
-  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.2); /* A semi-transparent white */
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
+
+/* The handle on hover */
 ::-webkit-scrollbar-thumb:hover {
-  background: #57534e;
+  background-color: rgba(255, 255, 255, 0.4); /* Becomes slightly more visible on hover */
 }

@@ -1,55 +1,30 @@
-// src/data/implementationSteps.js
-
-// This data structure drives the content for the Implementation page.
-// Each object represents a section in the visual workflow.
-
 export const implementationSteps = [
   {
-    id: 1,
-    title: "Code Ingestion & AST Parsing",
+    title: "Step 1: Project Scaffolding",
     description:
-      "We begin by ingesting your repository's source code. Each file is parsed into an Abstract Syntax Tree (AST), a structured tree representation of the code's syntax that allows for deep, semantic understanding.",
-    imageUrl: "/feature1.png", // Assumes images are in the public folder
-    reverse: false,
+      "Initialize a new React project using Vite for a lightning-fast development experience. Install core dependencies like Tailwind CSS for styling and Framer Motion for animations.",
+    image: "/feature1.png", // Correct image path
+    alt: "A code editor showing project setup commands.",
   },
   {
-    id: 2,
-    title: "AST-to-Embedding Transformation",
+    title: "Step 2: Core Component Architecture",
     description:
-      "The parsed ASTs are traversed and converted into meaningful numerical representations, or embeddings. This captures not just keywords, but the contextual relationships between functions, variables, and classes.",
-    imageUrl: "/feature2.png",
-    reverse: true,
+      "Build the foundational UI components, including the stable floating Sidebar, the context-aware UniversalHeader, and the reusable FeatureSection for content-heavy pages.",
+    image: "/feature2.png", // Correct image path
+    alt: "Diagram of React component hierarchy.",
   },
   {
-    id: 3,
-    title: "Knowledge Base Construction",
+    title: "Step 3: State Management & Routing",
     description:
-      "These embeddings are then indexed and stored in a specialized vector database. This creates a rich, queryable knowledge base that understands the architecture and logic of your entire codebase.",
-    imageUrl: "/feature3.png",
-    reverse: false,
+      "Implement React Router for seamless navigation and React Context for global state management. Create the AdminContext to dynamically control the application's theme and features.",
+    image: "/feature3.png", // Correct image path
+    alt: "A flowchart showing application state and routing logic.",
   },
   {
-    id: 4,
-    title: "RAG on Database",
+    title: "Step 4: Building the Chat Interface",
     description:
-      "When a query is made, we use a Retrieval-Augmented Generation (RAG) pipeline. The query is converted into an embedding and used to find the most relevant code chunks from the knowledge base.",
-    imageUrl: "/feature4.png",
-    reverse: true,
-  },
-  {
-    id: 5,
-    title: "LLM Query Augmentation",
-    description:
-      "The retrieved code context is then passed to a Large Language Model (LLM) along with the original query. This gives the model the precise information it needs to generate a highly accurate and context-aware response.",
-    imageUrl: "/feature1.png", // Placeholder image
-    reverse: false,
-  },
-  {
-    id: 6,
-    title: "Pass for Response Generation",
-    description:
-      "Finally, the LLM synthesizes the information to generate a complete, human-readable answer that directly addresses the user's query, backed by the specific context of their own repository.",
-    imageUrl: "/feature2.png", // Placeholder image
-    reverse: true,
+      "Develop the stateful ChatPage, which transitions from an initial prompt to an active conversation view. Utilize Framer Motion's layoutId for the signature 'morphing' input bar animation.",
+    image: "/feature4.png", // Correct image path
+    alt: "The chat interface transitioning between states.",
   },
 ];

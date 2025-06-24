@@ -1,14 +1,12 @@
-// src/components/UniversalSelector.jsx
-
 import { useState, useEffect, useRef } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAdmin } from "../context/AdminContext"; // IMPORT useAdmin
+import { useAdmin } from "../context/AdminContext";
 
 const UniversalSelector = ({ options, selectedValue, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const { isAdmin } = useAdmin(); // USE the hook
+  const { isAdmin } = useAdmin();
 
   const selectedOption =
     options.find((option) => option.id === selectedValue) || options[0];
@@ -22,9 +20,13 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
+  // --- ADDED: Defensive check to prevent errors if options are not ready ---
+  if (!selectedOption) {
+    return null; // Render nothing if there are no options to select from
+  }
+
   const Icon = selectedOption.icon;
 
-  // DYNAMIC HOVER CLASS
   const hoverClass = isAdmin
     ? "hover:bg-red-500/10 text-gray-300 hover:text-red-400"
     : "hover:bg-cyan-400/10 text-gray-300 hover:text-cyan-300";
@@ -32,7 +34,6 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
   return (
     <div className="relative w-52" ref={dropdownRef}>
       <motion.button
-        layoutId="universal-selector-button"
         onClick={() => setIsOpen((prev) => !prev)}
         className="flex items-center w-full justify-between gap-2 px-3 py-1.5 rounded-lg bg-white/[.05] border border-white/10 hover:bg-white/10 cursor-pointer transition-colors"
       >
@@ -65,7 +66,9 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="absolute top-full left-0 mt-2 w-full p-1 rounded-lg bg-stone-900 border border-white/10 shadow-lg z-50"
+            // --- THIS IS THE DEFINITIVE FIX ---
+            // These classes exactly match the glass effect of the sidebar and header.
+            className="absolute top-full left-0 mt-2 w-full p-1 rounded-xl bg-black/20 backdrop-blur-xl border border-white/10 shadow-lg z-50"
           >
             {options.map((option, i) => {
               const OptionIcon = option.icon;
@@ -83,6 +86,7 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
                     onChange(option.id);
                     setIsOpen(false);
                   }}
+                  // The list items themselves are not transparent, giving a floating effect.
                   className={`flex items-center gap-3 w-full px-3 py-2 rounded text-sm cursor-pointer transition-colors ${hoverClass}`}
                 >
                   <OptionIcon className="flex-shrink-0" />

@@ -1,5 +1,3 @@
-// src/components/ChatInputBar.jsx
-
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiSend } from "react-icons/fi";
@@ -8,10 +6,11 @@ import { MdComputer } from "react-icons/md";
 const modelOptions = [
   { id: "model1", name: "Claude Sonnet" },
   { id: "model2", name: "GPT-4o" },
-  { id: "model3", name: "Gemini Pro" },
+  { id: "model3", name: "Gemini Pro" }, // ← restored from old version
 ];
 
-const ChatInputBar = ({ onSubmit, layoutId }) => {
+// Accepts new 'isDisabled' prop
+const ChatInputBar = ({ onSubmit, layoutId, isDisabled = false }) => {
   const [inputText, setInputText] = useState("");
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(modelOptions[0]);
@@ -23,22 +22,21 @@ const ChatInputBar = ({ onSubmit, layoutId }) => {
         setIsModelSelectorOpen(false);
       }
     };
-    if (isModelSelectorOpen)
+    if (isModelSelectorOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+    }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isModelSelectorOpen]);
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    if (inputText.trim()) {
+    if (inputText.trim() && !isDisabled) {
       onSubmit(inputText);
       setInputText("");
     }
   };
 
   return (
-    // --- THIS IS THE CORRECTED LINE ---
-    // The conflicting "max-w-2xl" class has been removed.
     <motion.div
       layoutId={layoutId}
       className="relative w-full"
@@ -79,11 +77,13 @@ const ChatInputBar = ({ onSubmit, layoutId }) => {
 
       <form
         onSubmit={handleFormSubmit}
-        className="relative w-full h-14 rounded-full bg-stone-900/70 border border-white/10 shadow-lg backdrop-blur-md"
+        className={`relative w-full h-14 rounded-full bg-stone-900/70 border border-white/10 shadow-lg backdrop-blur-md transition-opacity ${
+          isDisabled ? "opacity-60 cursor-not-allowed" : ""
+        }`}
       >
         <button
           type="button"
-          onClick={() => setIsModelSelectorOpen((prev) => !prev)}
+          onClick={() => !isDisabled && setIsModelSelectorOpen((prev) => !prev)}
           className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center h-8 w-8 rounded-full hover:bg-white/10 transition-colors"
         >
           <MdComputer className="text-gray-400" />
@@ -93,13 +93,15 @@ const ChatInputBar = ({ onSubmit, layoutId }) => {
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="What is on your mind?"
+          placeholder={isDisabled ? "Processing..." : "What is on your mind?"}
           className="w-full h-full bg-transparent text-gray-200 pl-14 pr-16 focus:outline-none"
+          disabled={isDisabled}
         />
 
         <button
           type="submit"
           className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-cyan-400/20 text-cyan-300 hover:bg-cyan-400/30 transition-colors"
+          disabled={isDisabled}
         >
           <FiSend />
         </button>

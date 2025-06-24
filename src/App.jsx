@@ -1,10 +1,9 @@
-// src/App.jsx
-
 import { useState, useEffect, useRef } from "react";
 import { motion, MotionConfig, AnimatePresence } from "framer-motion";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { AdminProvider } from "./context/AdminContext";
 import { navItems } from "./navigation.js";
+import { mockRepos } from "./data/mockRepos.js";
 
 import HomePage from "./pages/HomePage";
 import ReposPage from "./pages/ReposPage";
@@ -15,7 +14,6 @@ import ChatPage from "./pages/ChatPage";
 import Sidebar from "./components/Sidebar";
 import UniversalHeader from "./components/UniversalHeader";
 
-// --- THIS IS THE ONE AND ONLY DECLARATION ---
 function useNavigationDirection() {
   const { pathname } = useLocation();
   const prevPathRef = useRef(pathname);
@@ -27,12 +25,11 @@ function useNavigationDirection() {
   const prevIndex = findIndex(prevPathRef.current);
   const currentIndex = findIndex(pathname);
   if (prevIndex !== -1 && currentIndex !== -1 && prevIndex !== currentIndex) {
-    if (currentIndex > prevIndex) return 1; // Down
-    if (currentIndex < prevIndex) return -1; // Up
+    if (currentIndex > prevIndex) return 1;
+    if (currentIndex < prevIndex) return -1;
   }
-  return 0; // Default to fade
+  return 0;
 }
-// ---------------------------------------------
 
 function AppRoutes({ sourceFilter, repoFilter }) {
   const location = useLocation();
@@ -63,29 +60,27 @@ function AppRoutes({ sourceFilter, repoFilter }) {
 
 function AppContent() {
   const [sourceFilter, setSourceFilter] = useState("all");
-  const [repoFilter, setRepoFilter] = useState("all");
+  const [repoFilter, setRepoFilter] = useState(mockRepos[0]?.id || "");
 
   return (
-    <div className="flex min-h-screen bg-stone-950 text-gray-200">
+    <div className="flex min-h-screen bg-gradient-to-tr from-purple-800 via-blue-900 to-slate-950 text-gray-200">
       <Sidebar />
-      <div className="flex-1 flex flex-col" style={{ paddingLeft: "72px" }}>
+      <div
+        className="flex flex-1 flex-col h-screen"
+        style={{ paddingLeft: "72px" }}
+      >
         <UniversalHeader
           sourceFilter={sourceFilter}
           onSourceChange={setSourceFilter}
           repoFilter={repoFilter}
           onRepoChange={setRepoFilter}
         />
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <AppRoutes sourceFilter={sourceFilter} repoFilter={repoFilter} />
-        </main>
-        <motion.footer
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="text-center py-4 text-gray-500 text-sm"
-        >
-          <p>© {new Date().getFullYear()} REPLOIT. All rights reserved.</p>
-        </motion.footer>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex">
+            <AppRoutes sourceFilter={sourceFilter} repoFilter={repoFilter} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -96,7 +91,8 @@ function App() {
     <AdminProvider>
       <MotionConfig>
         <AppContent />
-      </MotionConfig>
+      </MotionConfig>{" "}
+      {/* <-- This was the line with the typo, now corrected. */}
     </AdminProvider>
   );
 }

@@ -1,25 +1,22 @@
-// src/components/ConversationView.jsx
-
+import { motion, AnimatePresence } from "framer-motion";
 import MessageBubble from "./MessageBubble";
-import { AnimatePresence, motion } from "framer-motion";
 
+// --- SIMPLIFIED: No longer needs the containerRef prop ---
 const ConversationView = ({ messages }) => {
   return (
-    // This container is now a simple, full-width scrolling area.
-    <div className="flex-1 w-full space-y-6 overflow-y-auto pr-2">
-      <AnimatePresence>
-        {messages.map((message) => (
+    // The ref and extra classes have been removed from here.
+    <div className="flex flex-col space-y-6">
+      <AnimatePresence initial={false}>
+        {messages.map((msg) => (
           <motion.div
-            key={message.id}
+            key={msg.id}
             layout
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ type: "spring", damping: 20, stiffness: 150 }}
+            initial={{ opacity: 0, scale: 0.8, y: 50 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: -50 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
-            <MessageBubble author={message.author}>
-              <p>{message.text}</p>
-            </MessageBubble>
+            <MessageBubble message={msg} />
           </motion.div>
         ))}
       </AnimatePresence>
