@@ -1,3 +1,5 @@
+// src/App.jsx
+
 import { useState, useEffect, useRef } from "react";
 import { motion, MotionConfig, AnimatePresence } from "framer-motion";
 import { Route, Routes, useLocation } from "react-router-dom";
@@ -7,11 +9,9 @@ import { navItems } from "./navigation.js";
 import HomePage from "./pages/HomePage";
 import ReposPage from "./pages/ReposPage";
 import HistoryPage from "./pages/HistoryPage";
-import AdminHistoryPage from "./pages/AdminHistoryPage";
 import Sidebar from "./components/Sidebar";
 import UniversalHeader from "./components/UniversalHeader";
 
-// Custom hook to calculate navigation direction
 function useNavigationDirection() {
   const { pathname } = useLocation();
   const prevPathRef = useRef(pathname);
@@ -29,26 +29,38 @@ function useNavigationDirection() {
   return 0;
 }
 
-// Inner component to correctly use routing hooks
-function AppRoutes() {
+function AppRoutes({ sourceFilter, repoFilter }) {
   const location = useLocation();
   const direction = useNavigationDirection();
   return (
     <AnimatePresence mode="wait" custom={direction}>
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<HomePage />} />
-        <Route path="/repos" element={<ReposPage />} />
-        <Route path="/history" element={<HistoryPage />} />
-        <Route path="/admin/history" element={<AdminHistoryPage />} />
+        <Route
+          path="/repos"
+          element={<ReposPage sourceFilter={sourceFilter} />}
+        />
+        <Route
+          path="/history"
+          element={<HistoryPage selectedRepo={repoFilter} />}
+        />
+        <Route
+          path="/admin/history"
+          element={<HistoryPage selectedRepo={repoFilter} />}
+        />
       </Routes>
     </AnimatePresence>
   );
 }
 
-// Main content component that can safely use location hooks
 function AppContent() {
   const { pathname } = useLocation();
   const isHomePage = pathname === "/";
+
+  // State for the Repos page source filter
+  const [sourceFilter, setSourceFilter] = useState("all");
+  // State for the History page repo filter
+  const [repoFilter, setRepoFilter] = useState("all");
 
   return (
     <div className="flex min-h-screen bg-stone-950 text-gray-200">
@@ -60,9 +72,14 @@ function AppContent() {
         animate={{ paddingLeft: isHomePage ? "0rem" : "7rem" }}
         transition={{ type: "spring", damping: 20, stiffness: 100 }}
       >
-        <UniversalHeader />
+        <UniversalHeader
+          sourceFilter={sourceFilter}
+          onSourceChange={setSourceFilter}
+          repoFilter={repoFilter}
+          onRepoChange={setRepoFilter}
+        />
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
-          <AppRoutes />
+          <AppRoutes sourceFilter={sourceFilter} repoFilter={repoFilter} />
         </main>
         <motion.footer
           initial={{ opacity: 0 }}
@@ -77,7 +94,6 @@ function AppContent() {
   );
 }
 
-// The top-level App component now only provides context.
 function App() {
   return (
     <AdminProvider>

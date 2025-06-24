@@ -1,8 +1,10 @@
+// src/data/mockRepos.js
+
 export const mockRepos = [
   {
     id: "repo1",
     name: "Reploit-Backend-Core",
-    status: "indexed", // 'indexed', 'outdated', 'not_indexed'
+    status: "indexed",
   },
   {
     id: "repo2",

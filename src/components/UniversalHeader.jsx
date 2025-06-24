@@ -1,9 +1,25 @@
+// src/components/UniversalHeader.jsx
+
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, Link } from "react-router-dom";
 import { useAdmin } from "../context/AdminContext";
 import Logo from "./Logo";
-import CloudSelector from "./CloudSelector";
-import { MdSchedule, MdManageHistory } from "react-icons/md";
+import UniversalSelector from "./UniversalSelector";
+import { MdSchedule, MdManageHistory, MdFolderSpecial } from "react-icons/md"; // Import new icon
+import { FiGithub, FiFolder, FiBox, FiDatabase } from "react-icons/fi";
+import { SiGoogledrive } from "react-icons/si";
+import { mockRepos } from "../data/mockRepos";
+
+const repoSourceOptions = [
+  { id: "all", name: "All Sources", icon: FiDatabase },
+  { id: "github", name: "GitHub", icon: FiGithub },
+  { id: "drive", name: "Google Drive", icon: SiGoogledrive },
+];
+
+const repoFilterOptions = [
+  { id: "all", name: "All Repositories", icon: FiBox },
+  ...mockRepos.map((repo) => ({ ...repo, icon: FiFolder })),
+];
 
 const HomeControls = () => {
   const { isAdmin } = useAdmin();
@@ -31,10 +47,27 @@ const HomeControls = () => {
   );
 };
 
-const AppControls = () => {
+const AppControls = ({ selectorProps }) => {
   const { pathname } = useLocation();
   const { isAdmin, setIsAdmin } = useAdmin();
   const isReposPage = pathname.startsWith("/repos");
+
+  // --- NEW: CONTEXTUAL ICON LOGIC ---
+  const onHistoryPage =
+    pathname.startsWith("/history") || pathname.startsWith("/admin/history");
+
+  let ContextualIcon, contextualLink;
+  if (onHistoryPage) {
+    // If on history page, link to repos page
+    contextualLink = "/repos";
+    ContextualIcon = isAdmin ? MdFolderSpecial : FiFolder;
+  } else {
+    // On any other app page, link to history
+    contextualLink = isAdmin ? "/admin/history" : "/history";
+    ContextualIcon = isAdmin ? MdManageHistory : MdSchedule;
+  }
+  // --- END NEW LOGIC ---
+
   const adminButtonVariants = {
     inactive: {
       backgroundColor: "rgba(255, 255, 255, 0.05)",
@@ -45,8 +78,20 @@ const AppControls = () => {
       color: "rgb(248, 113, 113)",
     },
   };
+
   return (
-    <div className="flex items-center gap-6">
+    <div className="flex items-center gap-4">
+      <AnimatePresence>
+        {selectorProps && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <UniversalSelector {...selectorProps} />
+          </motion.div>
+        )}
+      </AnimatePresence>
       {isReposPage && (
         <motion.button
           onClick={() => setIsAdmin((prev) => !prev)}
@@ -58,24 +103,47 @@ const AppControls = () => {
           Admin Mode
         </motion.button>
       )}
-      <Link
-        to={isAdmin ? "/admin/history" : "/history"}
-        className="text-gray-400 hover:text-white transition-colors"
-      >
-        {isAdmin ? (
-          <MdManageHistory style={{ fontSize: "28px" }} />
-        ) : (
-          <MdSchedule style={{ fontSize: "28px" }} />
-        )}
-      </Link>
+      {/* --- REPLACED ICON --- */}
+      <motion.div>
+        <Link
+          to={contextualLink}
+          className="text-gray-400 hover:text-white transition-colors"
+        >
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname} // Keyed to trigger animation when path changes
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ContextualIcon size={28} />
+            </motion.div>
+          </AnimatePresence>
+        </Link>
+      </motion.div>
     </div>
   );
 };
 
-const UniversalHeader = () => {
+const UniversalHeader = (props) => {
   const { pathname } = useLocation();
   const isHomePage = pathname === "/";
-  const isReposPage = pathname.startsWith("/repos");
+
+  let selectorProps = null;
+  if (pathname.startsWith("/repos")) {
+    selectorProps = {
+      options: repoSourceOptions,
+      selectedValue: props.sourceFilter,
+      onChange: props.onSourceChange,
+    };
+  } else if (["/history", "/admin/history"].includes(pathname)) {
+    selectorProps = {
+      options: repoFilterOptions,
+      selectedValue: props.repoFilter,
+      onChange: props.onRepoChange,
+    };
+  }
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-8 bg-stone-950/80 backdrop-blur-lg border-b border-white/5">
@@ -83,19 +151,8 @@ const UniversalHeader = () => {
         <motion.div layoutId="app-logo-container">
           <Logo />
         </motion.div>
-        <AnimatePresence>
-          {isReposPage && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <CloudSelector />
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
-      <motion.div layoutId="header-controls-container">
+      <motion.div>
         <AnimatePresence mode="wait">
           {isHomePage ? (
             <motion.div
@@ -115,7 +172,7 @@ const UniversalHeader = () => {
               exit={{ opacity: 0, x: 25 }}
               transition={{ type: "tween", duration: 0.3, ease: "easeInOut" }}
             >
-              <AppControls />
+              <AppControls selectorProps={selectorProps} />
             </motion.div>
           )}
         </AnimatePresence>
