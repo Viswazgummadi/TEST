@@ -1,5 +1,6 @@
 // src/App.jsx
-import { useState, useEffect, useRef, useMemo } from "react";
+// ✅ CORRECTED IMPORT: Ensure useCallback is included here
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, MotionConfig, AnimatePresence } from "framer-motion";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { AdminProvider, useAdmin } from "./context/AdminContext";
@@ -78,7 +79,7 @@ function AppRoutes({ sourceFilter, repoFilter, dataSources, isLoadingSources, ha
               isLoading={isLoadingSources}
               onDeleteSource={() => { }}
               onDataSourceAdded={() => { }}
-              apiBaseUrl={apiBaseUrl} // Pass apiBaseUrl to ReposPage
+              apiBaseUrl={apiBaseUrl}
             />
           }
         />
@@ -95,7 +96,7 @@ function AppRoutes({ sourceFilter, repoFilter, dataSources, isLoadingSources, ha
                 isLoading={isLoadingSources}
                 onDeleteSource={handleDeleteSource}
                 onDataSourceAdded={onDataSourceAdded}
-                apiBaseUrl={apiBaseUrl} // Pass apiBaseUrl to ReposPage
+                apiBaseUrl={apiBaseUrl}
               />
             }
           />
@@ -119,10 +120,9 @@ function AppContent() {
   const [isLoadingSources, setIsLoadingSources] = useState(true);
   const [repoFilter, setRepoFilter] = useState("");
 
-  // ✅ Create the fetchApi function using the API_BASE_URL. useMemo for stability.
   const fetchApi = useMemo(() => createFetchApi(API_BASE_URL), []);
 
-  const fetchSources = useCallback(async () => { // Added useCallback
+  const fetchSources = useCallback(async () => { // This is line 125, which uses useCallback
     setIsLoadingSources(true);
     try {
       const sources = await fetchApi('/api/data-sources');
@@ -133,13 +133,13 @@ function AppContent() {
     } finally {
       setIsLoadingSources(false);
     }
-  }, [fetchApi]); // Depend on fetchApi
+  }, [fetchApi]);
 
   useEffect(() => {
     fetchSources();
   }, [fetchSources]);
 
-  const handleDeleteSource = useCallback(async (sourceIdToDelete) => { // Added useCallback
+  const handleDeleteSource = useCallback(async (sourceIdToDelete) => {
     if (!window.confirm("Are you sure you want to delete this source? This action cannot be undone.")) {
       return;
     }
@@ -157,7 +157,7 @@ function AppContent() {
       console.error("Error deleting source:", error);
       alert(`Deletion Failed: ${error.message}`);
     }
-  }, [token, fetchApi]); // Depend on token and fetchApi
+  }, [token, fetchApi]);
 
   const location = useLocation();
   const isChatPage = location.pathname === "/chat";
@@ -183,7 +183,7 @@ function AppContent() {
               handleDeleteSource={handleDeleteSource}
               onDataSourceAdded={fetchSources}
               setRepoFilter={setRepoFilter}
-              apiBaseUrl={API_BASE_URL} // Pass API_BASE_URL to AppRoutes
+              apiBaseUrl={API_BASE_URL}
             />
           </main>
         </div>
@@ -194,7 +194,6 @@ function AppContent() {
 
 function App() {
   return (
-    // ✅ Pass API_BASE_URL to AdminProvider
     <AdminProvider apiBaseUrl={API_BASE_URL}>
       <MotionConfig>
         <AppContent />
