@@ -1,13 +1,16 @@
 // src/pages/ReposPage.jsx
 
-import { useState, useEffect, useCallback } from "react"; // Added useCallback
+import { useState, useEffect, useCallback, useMemo } from "react"; // ✅ Add useMemo
 import { motion } from "framer-motion";
 import { useAdmin } from '../context/AdminContext';
 import RepoList from "../components/RepoList";
 import ConnectRepoModal from "../components/ConnectRepoModal";
 import GoogleFilesModal from "../components/GoogleFilesModal";
-import { FiGithub, FiPlus } from "react-icons/fi"; // FiPlus for the general "Connect" button
+import { FiGithub, FiPlus } from "react-icons/fi";
 import { FaGoogleDrive } from "react-icons/fa";
+
+// ✅ Import the new centralized fetchApi utility
+import createFetchApi from "../utils/api";
 
 const pageVariants = {
   initial: (direction) => ({ opacity: 0, y: direction * 50 }),
@@ -16,28 +19,15 @@ const pageVariants = {
   transition: { type: "tween", ease: "circOut", duration: 0.5 },
 };
 
-// Assuming fetchApi is available (from ConnectRepoModal/GoogleFilesModal scope or central utils)
-// If not, you may need to define it here or import it from a utility file
-const fetchApi = async (url, options = {}) => {
-  const { token } = options;
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  const response = await fetch(`http://localhost:5001${url}`, { ...options, headers });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-    throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
-  }
-  if (response.status === 204 || response.headers.get('content-length') === '0') return null;
-  return response.json();
-};
-
-const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDeleteSource, onDataSourceAdded }) => {
+// ✅ Receive apiBaseUrl as a prop
+const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDeleteSource, onDataSourceAdded, apiBaseUrl }) => {
   const { token } = useAdmin();
   const [filteredSources, setFilteredSources] = useState([]);
   const [isGithubModalOpen, setIsGithubModalOpen] = useState(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+
+  // ✅ Create fetchApi instance for this component's scope using the passed apiBaseUrl
+  const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
@@ -66,54 +56,48 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
 
   const handleGoogleConnectClick = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/connect/google/auth-url', {
-        headers: { 'Authorization': `Bearer ${token}` }
+      // ✅ Use the new fetchApi instance
+      const data = await fetchApi('/api/connect/google/auth-url', {
+        token: token // Pass token in the options object as fetchApi expects
       });
-      if (!response.ok) throw new Error('Failed to get auth URL');
-      const data = await response.json();
       window.location.href = data.authorization_url;
     } catch (error) {
       alert(`Error starting Google connection: ${error.message}`);
     }
   };
 
-  // ✅ NEW ADMIN ACTION HANDLERS
   const handleReindexSource = useCallback(async (sourceId) => {
     if (!token || !window.confirm("Are you sure you want to re-index this source? This will re-process all its content.")) return;
     try {
-      // You'll need to create this backend endpoint later
       await fetchApi(`/api/data-sources/${sourceId}/reindex`, { method: 'POST', token });
       alert("Re-indexing initiated!");
-      if (onDataSourceAdded) onDataSourceAdded(); // Refresh list to update status
+      if (onDataSourceAdded) onDataSourceAdded();
     } catch (error) {
       alert(`Failed to re-index: ${error.message}`);
     }
-  }, [token, onDataSourceAdded]);
+  }, [token, onDataSourceAdded, fetchApi]);
 
   const handleSyncSource = useCallback(async (sourceId) => {
     if (!token || !window.confirm("Are you sure you want to sync changes for this source?")) return;
     try {
-      // You'll need to create this backend endpoint later
       await fetchApi(`/api/data-sources/${sourceId}/sync`, { method: 'POST', token });
       alert("Sync initiated!");
-      if (onDataSourceAdded) onDataSourceAdded(); // Refresh list to update status
+      if (onDataSourceAdded) onDataSourceAdded();
     } catch (error) {
       alert(`Failed to sync: ${error.message}`);
     }
-  }, [token, onDataSourceAdded]);
+  }, [token, onDataSourceAdded, fetchApi]);
 
   const handleDeleteEmbeddings = useCallback(async (sourceId) => {
     if (!token || !window.confirm("Are you sure you want to delete embeddings for this source? This will remove all AI knowledge but keep the connection record.")) return;
     try {
-      // You'll need to create this backend endpoint later
       await fetchApi(`/api/data-sources/${sourceId}/delete-embeddings`, { method: 'DELETE', token });
       alert("Embeddings deleted!");
-      if (onDataSourceAdded) onDataSourceAdded(); // Refresh list to update status
+      if (onDataSourceAdded) onDataSourceAdded();
     } catch (error) {
       alert(`Failed to delete embeddings: ${error.message}`);
     }
-  }, [token, onDataSourceAdded]);
-
+  }, [token, onDataSourceAdded, fetchApi]);
 
   if (isLoading) {
     return <p className="text-center text-gray-400 mt-8">Loading Data Sources...</p>;
@@ -153,10 +137,10 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
         <RepoList
           sources={filteredSources}
           isAdmin={isAdminView}
-          onDeleteSource={onDeleteSource} // Delete entire record
-          onReindexSource={handleReindexSource} // New
-          onSyncSource={handleSyncSource}       // New
-          onDeleteEmbeddings={handleDeleteEmbeddings} // New
+          onDeleteSource={onDeleteSource}
+          onReindexSource={handleReindexSource}
+          onSyncSource={handleSyncSource}
+          onDeleteEmbeddings={handleDeleteEmbeddings}
         />
       </motion.div>
 
@@ -164,11 +148,13 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
         isOpen={isGithubModalOpen}
         onClose={() => setIsGithubModalOpen(false)}
         onConnectSuccess={handleConnectSuccess}
+        apiBaseUrl={apiBaseUrl} // Pass apiBaseUrl to ConnectRepoModal
       />
       <GoogleFilesModal
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}
         onConnectSuccess={handleConnectSuccess}
+        apiBaseUrl={apiBaseUrl} // Pass apiBaseUrl to GoogleFilesModal
       />
     </>
   );

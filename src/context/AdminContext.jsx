@@ -1,20 +1,28 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom"; // ✅ Import useLocation and useNavigate
-import { navItems } from "../navigation.js"; // ✅ Import navItems
+import { createContext, useContext, useState, useEffect, useMemo } from "react"; // ✅ Add useMemo
+import { useLocation, useNavigate } from "react-router-dom";
+import { navItems } from "../navigation.js";
+
+// ✅ Import the new centralized fetchApi utility
+import createFetchApi from "../utils/api";
 
 const AdminContext = createContext();
 
 export const useAdmin = () => useContext(AdminContext);
 
-export const AdminProvider = ({ children }) => {
+// ✅ AdminProvider now accepts apiBaseUrl as a prop
+export const AdminProvider = ({ children, apiBaseUrl }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [token, setToken] = useState(
     localStorage.getItem("adminToken") || null
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const navigate = useNavigate(); // ✅ Initialize navigate
-  const location = useLocation(); // ✅ Initialize location
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // ✅ Create the fetchApi function using the provided apiBaseUrl
+  // useMemo ensures this function is only re-created if apiBaseUrl changes
+  const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
   useEffect(() => {
     if (token) {
@@ -30,25 +38,20 @@ export const AdminProvider = ({ children }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:5001/api/admin/login", {
+      // ✅ Use the new centralized fetchApi instance
+      const data = await fetchApi("/api/admin/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Login failed");
-      }
-
+      // fetchApi already handles response.ok and parsing JSON,
+      // so 'data' will either be the successful JSON or an error thrown.
       setToken(data.token);
       setIsLoading(false);
       return true;
     } catch (err) {
       console.error("Login error:", err);
+      // The error message from fetchApi should be more informative
       setError(err.message);
       setIsLoading(false);
       setToken(null);
@@ -58,16 +61,12 @@ export const AdminProvider = ({ children }) => {
 
   const logout = () => {
     setToken(null);
-    // ✅ NEW: Post-logout redirection logic
     const currentPath = location.pathname;
-    // Check if the current path is an admin-specific path
     if (currentPath.startsWith("/admin/")) {
       const navItem = navItems.find(item => item.adminHref === currentPath);
       if (navItem && navItem.href) {
-        // If there's a public equivalent, go there
         navigate(navItem.href, { replace: true });
       } else {
-        // Otherwise, redirect to a safe public page like the homepage
         navigate('/', { replace: true });
       }
     }

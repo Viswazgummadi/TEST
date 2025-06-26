@@ -1,30 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAdmin } from '../context/AdminContext'; // We need this for the auth token
+import React, { useState, useEffect, useCallback, useMemo } from 'react'; // ✅ Add useMemo
+import { useAdmin } from '../context/AdminContext';
 import { FiGithub, FiX, FiLoader, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// This utility function can be moved to a central file like 'src/utils/api.js' later
-const fetchApi = async (url, options = {}) => {
-    const { token } = options;
-    const headers = { 'Content-Type': 'application/json', ...options.headers };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    const response = await fetch(`http://localhost:5001${url}`, { ...options, headers });
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
-    }
-    if (response.status === 204 || response.headers.get('content-length') === '0') return null;
-    return response.json();
-};
+// ✅ Import the new centralized fetchApi utility
+import createFetchApi from "../utils/api";
 
-const ConnectRepoModal = ({ isOpen, onClose, onConnectSuccess }) => {
+// ✅ Receive apiBaseUrl as a prop
+const ConnectRepoModal = ({ isOpen, onClose, onConnectSuccess, apiBaseUrl }) => {
     const { token } = useAdmin();
     const [repos, setRepos] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [connectingRepo, setConnectingRepo] = useState(null); // Tracks the full_name of the repo being connected
+    const [connectingRepo, setConnectingRepo] = useState(null);
+
+    // ✅ Create fetchApi instance for this component's scope using the passed apiBaseUrl
+    const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
     const fetchAvailableRepos = useCallback(async () => {
         if (!token) return;
@@ -38,7 +29,7 @@ const ConnectRepoModal = ({ isOpen, onClose, onConnectSuccess }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [token, fetchApi]);
 
     useEffect(() => {
         if (isOpen) {
@@ -63,7 +54,7 @@ const ConnectRepoModal = ({ isOpen, onClose, onConnectSuccess }) => {
                 token,
                 body: JSON.stringify(payload)
             });
-            onConnectSuccess(); // This calls the handler passed from ReposPage
+            onConnectSuccess();
         } catch (err) {
             alert(`Failed to connect repository: ${err.message}`);
         } finally {

@@ -1,28 +1,61 @@
 // src/utils/api.js
 
-const API_BASE_URL = 'http://127.0.0.1:5001'; // ✅ Explicitly use IPv4 loopback
+const createFetchApi = (baseURL) => {
+  if (!baseURL) {
+    console.error("createFetchApi: baseURL is undefined. API calls will fail.");
+    // Return a dummy function to prevent crashes, but log the error
+    return async (url, options = {}) => {
+      console.error(
+        `Attempted API call to ${url} with no base URL configured.`
+      );
+      throw new Error("API_BASE_URL not configured.");
+    };
+  }
 
-const fetchApi = async (url, options = {}) => {
+  return async (url, options = {}) => {
     const { token } = options;
-    const headers = { 'Content-Type': 'application/json', ...options.headers };
+    const headers = { "Content-Type": "application/json", ...options.headers };
     if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // Ensure the URL is correctly formed by joining base with relative path
-    const fullUrl = `${API_BASE_URL}${url}`;
+    const fullUrl = `${baseURL}${url}`; // Construct the full URL using the provided baseURL
 
-    const response = await fetch(fullUrl, { ...options, headers });
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
+    try {
+      const response = await fetch(fullUrl, { ...options, headers });
+      if (!response.ok) {
+        let errorData = {};
+        try {
+          // Try to parse JSON error, but handle cases where response body might be empty or not JSON
+          errorData = await response.json();
+        } catch (e) {
+          // If JSON parsing fails, use response status text
+          errorData = {
+            message: response.statusText || "An unknown error occurred",
+          };
+        }
+        throw new Error(
+          errorData.message ||
+            errorData.error ||
+            `HTTP error! status: ${response.status}`
+        );
+      }
+      if (
+        response.status === 204 ||
+        response.headers.get("content-length") === "0"
+      )
+        return null; // No content for 204 or empty response
+      return response.json();
+    } catch (err) {
+      // Re-throw with more context if it's a network error before response
+      if (err instanceof TypeError && err.message === "Failed to fetch") {
+        throw new Error(
+          `Network error or CORS issue: Could not connect to ${fullUrl}. Details: ${err.message}`
+        );
+      }
+      throw err; // Re-throw the original error from fetchApi logic
     }
-
-    // Handle empty responses (like 204 No Content) gracefully
-    if (response.status === 204 || response.headers.get('content-length') === '0') return null;
-
-    return response.json();
+  };
 };
 
-export default fetchApi;
+export default createFetchApi;

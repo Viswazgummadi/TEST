@@ -1,30 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react'; // ✅ Add useMemo
 import { useAdmin } from '../context/AdminContext';
-import { FiFolder, FiX, FiLoader, FiCheckCircle, FiAlertCircle } from 'react-icons/fi'; // Using FiFolder for Drive
+import { FiFolder, FiX, FiLoader, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// This utility function should be moved to a central file like 'src/utils/api.js'
-const fetchApi = async (url, options = {}) => {
-    const { token } = options;
-    const headers = { 'Content-Type': 'application/json', ...options.headers };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    const response = await fetch(`http://localhost:5001${url}`, { ...options, headers });
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
-    }
-    if (response.status === 204 || response.headers.get('content-length') === '0') return null;
-    return response.json();
-};
+// ✅ Import the new centralized fetchApi utility
+import createFetchApi from "../utils/api";
 
-const GoogleFilesModal = ({ isOpen, onClose, onConnectSuccess }) => {
+// ✅ Receive apiBaseUrl as a prop
+const GoogleFilesModal = ({ isOpen, onClose, onConnectSuccess, apiBaseUrl }) => {
     const { token } = useAdmin();
     const [folders, setFolders] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [connectingFolderId, setConnectingFolderId] = useState(null);
+
+    // ✅ Create fetchApi instance for this component's scope using the passed apiBaseUrl
+    const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
     const fetchAvailableFolders = useCallback(async () => {
         if (!token) return;
@@ -38,7 +29,7 @@ const GoogleFilesModal = ({ isOpen, onClose, onConnectSuccess }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [token]);
+    }, [token, fetchApi]);
 
     useEffect(() => {
         if (isOpen) {
@@ -51,7 +42,7 @@ const GoogleFilesModal = ({ isOpen, onClose, onConnectSuccess }) => {
         try {
             const payload = {
                 name: folder.name,
-                source_type: 'google_drive', // Set the correct source type
+                source_type: 'google_drive',
                 connection_details: {
                     file_id: folder.id,
                     name: folder.name,
