@@ -1,22 +1,50 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import InitialPrompt from "../components/InitialPrompt";
 import ChatInputBar from "../components/ChatInputBar";
 import ConversationView from "../components/ConversationView";
 import { useSearchParams } from "react-router-dom"; // ✅ Import useSearchParams
-
-const API_BASE_URL = "http://localhost:5001";
-
+import createFetchApi from "../utils/api";
+ 
 // ✅ Accept setRepoFilter and dataSources props
-const ChatPage = ({ selectedRepo, setRepoFilter, dataSources }) => {
+const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
   const [pageState, setPageState] = useState("initial");
   const [messages, setMessages] = useState([]);
   const scrollContainerRef = useRef(null);
   const currentAiMessageIdRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams(); // ✅ Initialize useSearchParams
+  const [availableModels, setAvailableModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState(null);
+  const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const [modelsError, setModelsError] = useState(null);
+  const initialDefaultModelId = "gemini-1.5-flash";
+
+  const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
   const isRepoSelected = !!selectedRepo;
-
+  useEffect(() => {
+    const getModels = async () => {
+      setIsLoadingModels(true);
+      setModelsError(null);
+      try {
+        const fetchedModels = await fetchApi("/api/chat/available-models/");
+        setAvailableModels(fetchedModels || []);
+        if (fetchedModels && fetchedModels.length > 0) {
+          const defaultModel = fetchedModels.find(m => m.id === initialDefaultModelId) || fetchedModels[0];
+          setSelectedModel(defaultModel);
+        } else {
+          setSelectedModel(null);
+        }
+      } catch (err) {
+        setModelsError(err.message);
+        setAvailableModels([]);
+        setSelectedModel(null);
+      } finally {
+        setIsLoadingModels(false);
+      }
+    };
+    getModels();
+  }, [fetchApi, initialDefaultModelId]);
   // ✅ NEW useEffect to handle URL source parameter
   useEffect(() => {
     const sourceIdFromUrl = searchParams.get('source');
@@ -45,7 +73,7 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources }) => {
     }
   }, [messages, pageState]);
 
-  const handleSubmit = async (queryText, modelId) => {
+  const handleSubmit = async (queryText) => {
     if (!queryText.trim()) {
       if (pageState === "processing") setPageState("active_conversation");
       return;
@@ -62,17 +90,17 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources }) => {
       return;
     }
 
-    if (!modelId && pageState !== "initial") {
+    // Block 2: Check if an AI model is selected
+    if (!selectedModel) {
       const modelNotSelectedError = {
         id: `syserr-model-${Date.now()}`,
-        text: "No model selected. Please click the 💻 icon to choose a model.",
+        text: "No model selected. Please click the 💻 icon in the input bar to choose a model.",
         author: "system_error",
       };
       setMessages((prev) => [...prev, modelNotSelectedError]);
       setPageState("active_conversation");
       return;
     }
-
     setPageState("processing");
 
     const newUserMessage = {
@@ -108,18 +136,17 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources }) => {
     ]);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/chat/`, {
+      const response = await fetch(`${apiBaseUrl}/api/chat/`, { // Construct full URL
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           query: queryText,
-          model: modelId || "gemini-1.5-flash",
+          model: selectedModel.id,
           data_source_id: selectedRepo,
         }),
       });
-
       if (!response.ok) {
         let errorData = { error: `API Error: ${response.status} ${response.statusText}` };
         try {
@@ -295,10 +322,15 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources }) => {
               )}
               <div className="w-full">
                 <ChatInputBar
-                  layoutId="chat-input-bar"
                   onSubmit={handleSubmit}
                   isDisabled={isChatInputDisabled}
                   isRepoSelected={isRepoSelected}
+                  // ✅ Pass all the new state and handlers down
+                  availableModels={availableModels}
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  isLoadingModels={isLoadingModels}
+                  modelsError={modelsError}
                 />
               </div>
             </div>
@@ -319,12 +351,17 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources }) => {
               </div>
             </div>
             <div className="flex-shrink-0 w-full pt-3 pb-3">
-              <ChatInputBar
-                layoutId="chat-input-bar"
-                onSubmit={handleSubmit}
-                isDisabled={isChatInputDisabled}
-                isRepoSelected={isRepoSelected}
-              />
+                <ChatInputBar
+                  onSubmit={handleSubmit}
+                  isDisabled={isChatInputDisabled}
+                  isRepoSelected={isRepoSelected}
+                  // ✅ Pass all the new state and handlers down
+                  availableModels={availableModels}
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  isLoadingModels={isLoadingModels}
+                  modelsError={modelsError}
+                />
             </div>
           </motion.div>
         )}

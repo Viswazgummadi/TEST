@@ -1,34 +1,15 @@
 // src/components/ModelSelector.jsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef,UseMemo } from "react";
 import { FiChevronDown, FiCpu } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAdmin } from "../context/AdminContext";
-
-const fetchApi = async (url, options = {}) => {
-  const headers = { "Content-Type": "application/json", ...options.headers };
-  const response = await fetch(`http://localhost:5001${url}`, {
-    ...options,
-    headers,
-  });
-  if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "An unknown error occurred" }));
-    throw new Error(
-      errorData.message ||
-        errorData.error ||
-        `HTTP error! status: ${response.status}`
-    );
-  }
-  if (response.status === 204 || response.headers.get("content-length") === "0")
-    return null;
-  return response.json();
-};
+import createFetchApi from '../utils/api'; // ✅ Import the centralized utility
 
 const ModelSelector = ({
   selectedModelId,
   onModelChange,
   initialDefaultModelId = "gemini-1.5-flash",
+  apiBaseUrl
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [models, setModels] = useState([]);
@@ -36,22 +17,20 @@ const ModelSelector = ({
   const [error, setError] = useState(null);
   const dropdownRef = useRef(null);
   const { isAdmin } = useAdmin();
+  const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
   useEffect(() => {
     const getModels = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const fetchedModels = await fetchApi("/api/chat/available-models");
+        // ✅ Use the new fetchApi instance
+        const fetchedModels = await fetchApi("/api/chat/available-models/"); // Added trailing slash for consistency
         setModels(fetchedModels || []);
         if (fetchedModels && fetchedModels.length > 0) {
-          const currentSelectionIsValid = fetchedModels.some(
-            (m) => m.id === selectedModelId
-          );
+          const currentSelectionIsValid = fetchedModels.some(m => m.id === selectedModelId);
           if (!selectedModelId || !currentSelectionIsValid) {
-            const defaultModel =
-              fetchedModels.find((m) => m.id === initialDefaultModelId) ||
-              fetchedModels[0];
+            const defaultModel = fetchedModels.find(m => m.id === initialDefaultModelId) || fetchedModels[0];
             if (defaultModel) onModelChange(defaultModel.id);
             else onModelChange(null);
           }
@@ -67,8 +46,7 @@ const ModelSelector = ({
       }
     };
     getModels();
-  }, []);
-
+  }, [apiBaseUrl, initialDefaultModelId, onModelChange, selectedModelId, fetchApi]); // ✅ Add fetchApi to dependencies
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target))

@@ -60,6 +60,7 @@ function AppRoutes({ sourceFilter, repoFilter, dataSources, isLoadingSources, ha
               selectedRepo={repoFilter}
               setRepoFilter={setRepoFilter}
               dataSources={dataSources}
+              apiBaseUrl={apiBaseUrl}
             />
           }
         />
