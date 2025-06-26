@@ -1,17 +1,42 @@
 // src/components/AdminLoginForm.jsx
 import { useState } from "react";
 import { useAdmin } from "../context/AdminContext";
+import { useNavigate, useLocation } from "react-router-dom"; // ✅ Import useNavigate and useLocation
+import { navItems } from "../navigation.js"; // ✅ Import navItems
 
 const AdminLoginForm = ({ onSuccess }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const { login, isLoading, error } = useAdmin();
+  const navigate = useNavigate(); // ✅ Initialize navigate
+  const location = useLocation(); // ✅ Initialize location
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const success = await login(username, password);
     if (success && onSuccess) {
       onSuccess(); // Callback for successful login, e.g., to close a modal
+
+      // ✅ NEW: Post-login redirection logic
+      const currentPath = location.pathname;
+      const navItem = navItems.find(item => item.href === currentPath);
+
+      // If the user was on a public page that has an admin equivalent, redirect them.
+      // Example: If on /repos (public), and it has an adminHref like /admin/repos, go there.
+      if (navItem && navItem.adminHref) {
+        navigate(navItem.adminHref, { replace: true });
+      } else if (!currentPath.startsWith("/admin")) {
+        // If they were on a non-admin page without a direct adminHref
+        // (like /home, /chat, etc.), redirect to a default admin page if desired,
+        // or just let them stay. For now, let's redirect to /admin/repos if applicable.
+        const reposNavItem = navItems.find(item => item.text === "Repos"); // Find the repos item
+        if (reposNavItem && reposNavItem.adminHref) {
+          navigate(reposNavItem.adminHref, { replace: true });
+        } else {
+          // Fallback: If no specific adminHref, maybe redirect to settings or just stay
+          navigate('/admin/settings', { replace: true }); // Default to admin settings
+        }
+      }
     }
   };
 

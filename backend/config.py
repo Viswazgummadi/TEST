@@ -30,3 +30,8 @@ class Config:
     # Initial Admin User Credentials (for CLI command)
     INITIAL_ADMIN_USERNAME = os.environ.get('INITIAL_ADMIN_USERNAME', 'admin')
     INITIAL_ADMIN_PASSWORD = os.environ.get('INITIAL_ADMIN_PASSWORD', '123')
+        # ✅ ADD THESE LINES FOR GOOGLE OAUTH
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', None)
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', None)
+    # The redirect URI should point to our backend callback endpoint
+    GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:5001/api/connect/google/callback')

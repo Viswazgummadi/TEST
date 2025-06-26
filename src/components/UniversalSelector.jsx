@@ -1,3 +1,5 @@
+// src/components/UniversalSelector.jsx
+
 import { useState, useEffect, useRef } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,7 +11,9 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
   const { isAdmin } = useAdmin();
 
   const selectedOption =
-    options.find((option) => option.id === selectedValue) || options[0];
+    options.find((option) => option.id === selectedValue) ||
+    options.find((option) => option.disabled) ||
+    options[0];
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -20,9 +24,8 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  // --- ADDED: Defensive check to prevent errors if options are not ready ---
   if (!selectedOption) {
-    return null; // Render nothing if there are no options to select from
+    return <div className="relative w-52 h-[34px] rounded-lg bg-white/[.05] border border-white/10 animate-pulse"></div>;
   }
 
   const Icon = selectedOption.icon;
@@ -46,16 +49,16 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 5 }}
               transition={{ duration: 0.2 }}
-              className="font-medium text-sm text-gray-200 truncate"
+              className={`font-medium text-sm truncate ${selectedOption.disabled ? 'text-gray-500' : 'text-gray-200'
+                }`}
             >
               {selectedOption.name}
             </motion.span>
           </AnimatePresence>
         </div>
         <FiChevronDown
-          className={`text-gray-500 transition-transform duration-300 ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`text-gray-500 transition-transform duration-300 ${isOpen ? "rotate-180" : ""
+            }`}
         />
       </motion.button>
 
@@ -66,15 +69,13 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            // --- THIS IS THE DEFINITIVE FIX ---
-            // These classes exactly match the glass effect of the sidebar and header.
             className="absolute top-full left-0 mt-2 w-full p-1 rounded-xl bg-black/20 backdrop-blur-xl border border-white/10 shadow-lg z-50"
           >
-            {options.map((option, i) => {
+            {(options || []).map((option, i) => {
               const OptionIcon = option.icon;
               return (
                 <motion.div
-                  key={option.id}
+                  key={option.id || `option-${i}`}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{
                     opacity: 1,
@@ -83,11 +84,14 @@ const UniversalSelector = ({ options, selectedValue, onChange }) => {
                   }}
                   exit={{ opacity: 0, x: 10 }}
                   onClick={() => {
+                    if (option.disabled) return;
                     onChange(option.id);
                     setIsOpen(false);
                   }}
-                  // The list items themselves are not transparent, giving a floating effect.
-                  className={`flex items-center gap-3 w-full px-3 py-2 rounded text-sm cursor-pointer transition-colors ${hoverClass}`}
+                  className={`flex items-center gap-3 w-full px-3 py-2 rounded text-sm transition-colors ${option.disabled
+                      ? 'text-gray-600 cursor-default'
+                      : `cursor-pointer ${hoverClass}`
+                    }`}
                 >
                   <OptionIcon className="flex-shrink-0" />
                   <span>{option.name}</span>

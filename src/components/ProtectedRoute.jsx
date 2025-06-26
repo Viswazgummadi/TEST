@@ -1,20 +1,28 @@
 // src/components/ProtectedRoute.jsx
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom"; // ✅ 1. IMPORT useLocation
 import { useAdmin } from "../context/AdminContext";
 
 const ProtectedRoute = () => {
-  const { isAdmin, token } = useAdmin(); // Check token for robustness
+  const { isAdmin, token } = useAdmin();
+  const location = useLocation(); // ✅ 2. GET THE CURRENT LOCATION
 
-  // If still loading token status, maybe show a loader
-  // if (isLoadingToken) return <LoadingSpinner />;
+  // ✅ 3. CHECK FOR THE GOOGLE AUTH SUCCESS PARAMETER
+  const queryParams = new URLSearchParams(location.search);
+  const isGoogleAuthSuccess = queryParams.get('gauth') === 'success';
 
+  // If we are coming back from a successful Google OAuth flow,
+  // allow rendering the page even if the token/isAdmin state isn't immediately ready.
+  // The ReposPage will handle opening the modal.
+  if (isGoogleAuthSuccess) {
+    return <Outlet />;
+  }
+
+  // Original protection logic: If not Google auth success, and not admin, redirect.
   if (!isAdmin || !token) {
-    // Redirect to login page or home page if not admin
-    // For now, let's redirect to home. A dedicated /login page might be better.
     return <Navigate to="/" replace />;
   }
 
-  return <Outlet />; // Render the child route (AdminSettingsPage)
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

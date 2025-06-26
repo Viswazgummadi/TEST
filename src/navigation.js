@@ -1,15 +1,28 @@
-import { FiHome, FiFolder, FiClock, FiCode, FiBox, FiSettings } from "react-icons/fi";
-import { MdManageHistory, MdFolderSpecial, MdMarkChatUnread } from 'react-icons/md'; // <-- NEW ICON IMPORT
+// src/navigation.js
+import {
+  FiHome,
+  FiFolder,
+  FiClock,
+  FiCode,
+  FiBox,
+  FiSettings,
+} from "react-icons/fi";
+import {
+  MdManageHistory,
+  MdFolderSpecial,
+  MdMarkChatUnread,
+} from "react-icons/md";
 
 export const navItems = [
   { text: "Home", href: "/", defaultIcon: FiHome },
   { text: "Chat", href: "/chat", defaultIcon: MdMarkChatUnread },
-
   {
+    // This is now the link ALL users will see.
     text: "Repos",
-    href: "/repos",
+    href: "/repos", // Public, read-only view
     defaultIcon: FiFolder,
-    adminIcon: MdFolderSpecial,
+    adminIcon: MdFolderSpecial, // Admins see a special icon...
+    adminHref: "/admin/repos", // ...which links to the admin management page.
   },
   {
     text: "History",
@@ -22,10 +35,10 @@ export const navItems = [
   { text: "Deployment", href: "/deployment", defaultIcon: FiBox },
   {
     name: "Admin Settings",
-    href: "/admin/settings", // The new route
-    defaultIcon: FiSettings, // Icon for regular users (might be hidden or disabled)
-    adminIcon: FiSettings, // Icon for admin users (clearly visible and active)
+    href: "/admin/settings",
+    defaultIcon: FiSettings,
+    adminIcon: FiSettings,
     text: "Settings",
-    isAdminOnly: true, // Custom flag to help Sidebar.jsx identify it
+    isAdminOnly: true,
   },
 ];

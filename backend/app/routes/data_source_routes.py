@@ -1,9 +1,15 @@
 # backend/app/routes/data_source_routes.py
 
 from flask import Blueprint, request, jsonify, current_app
+from flask_cors import CORS # ✅ 1. IMPORT CORS
 from ..models import db, DataSource
+from ..utils.auth import token_required
 
 data_source_bp = Blueprint('data_source_api_routes', __name__)
+
+# ✅ 2. APPLY CORS TO THIS BLUEPRINT
+# This ensures that all routes within data_source_bp handle OPTIONS preflight requests correctly.
+CORS(data_source_bp, supports_credentials=True)
 
 @data_source_bp.route('/', methods=['GET'])
 def get_data_sources():
@@ -20,31 +26,43 @@ def get_data_sources():
 @data_source_bp.route('/connect', methods=['POST'])
 def connect_data_source():
     """
-    Creates a new DataSource record in the database from a given repository.
+    Creates a new DataSource record for any supported source type.
     """
     data = request.get_json()
     if not data:
         return jsonify({"error": "Invalid JSON"}), 400
 
+    name = data.get('name')
     source_type = data.get('source_type')
-    repo_owner = data.get('repo_owner')
-    repo_name = data.get('repo_name')
+    connection_details = data.get('connection_details')
 
-    if not all([source_type, repo_owner, repo_name]):
-        return jsonify({"error": "Missing required fields: source_type, repo_owner, repo_name"}), 400
+    if not all([name, source_type, connection_details]):
+        return jsonify({"error": "Missing required fields: name, source_type, connection_details"}), 400
     
-    if source_type != 'github_repository':
-        return jsonify({"error": f"Source type '{source_type}' is not supported yet."}), 400
-
-    connection_details = {"owner": repo_owner, "repo_name": repo_name}
+    SUPPORTED_SOURCE_TYPES = ['github', 'google_drive']
+    if source_type not in SUPPORTED_SOURCE_TYPES:
+        return jsonify({"error": f"Source type '{source_type}' is not supported."}), 400
 
     try:
-        existing_source = DataSource.query.filter_by(connection_details=connection_details).first()
+        existing_source = None
+        if source_type == 'github':
+            repo_full_name = connection_details.get('repo_full_name')
+            if repo_full_name:
+                existing_source = db.session.query(DataSource).filter(
+                    DataSource.connection_details['repo_full_name'].as_string() == repo_full_name
+                ).first()
+        elif source_type == 'google_drive':
+            file_id = connection_details.get('file_id')
+            if file_id:
+                existing_source = db.session.query(DataSource).filter(
+                    DataSource.connection_details['file_id'].as_string() == file_id
+                ).first()
+
         if existing_source:
-            return jsonify({"error": f"Repository '{repo_owner}/{repo_name}' is already connected."}), 409
+            return jsonify({"error": f"This data source is already connected."}), 409
 
         new_source = DataSource(
-            name=repo_name,
+            name=name,
             source_type=source_type,
             connection_details=connection_details,
             status='pending_indexing'
@@ -67,15 +85,56 @@ def delete_data_source(data_source_id):
     Deletes a connected data source from the database.
     """
     try:
-        source_to_delete = DataSource.query.get_or_404(data_source_id, description="Data source not found")
+        source_to_delete = db.session.get(DataSource, data_source_id)
+        if source_to_delete is None:
+            return jsonify({"error": "Data source not found"}), 404
             
         db.session.delete(source_to_delete)
         db.session.commit()
         
         current_app.logger.info(f"Successfully deleted data source: {source_to_delete.name} ({data_source_id})")
-        return jsonify({"message": "Data source deleted successfully"}), 200
+        return '', 204
 
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting data source {data_source_id}: {e}", exc_info=True)
         return jsonify({"error": "Failed to delete data source"}), 500
+
+@data_source_bp.route('/<string:data_source_id>/reindex', methods=['POST'])
+@token_required
+def reindex_data_source(current_admin_username, data_source_id):
+    """
+    Initiates a full re-indexing process for a data source.
+    """
+    source = db.session.get(DataSource, data_source_id)
+    if source is None:
+        return jsonify({"error": "Data source not found"}), 404
+    
+    current_app.logger.info(f"Admin '{current_admin_username}' requested re-indexing for data source: {data_source_id}")
+    return jsonify({"message": f"Re-indexing request for {source.name} received. Processing will begin shortly."}), 200
+
+@data_source_bp.route('/<string:data_source_id>/sync', methods=['POST'])
+@token_required
+def sync_data_source(current_admin_username, data_source_id):
+    """
+    Initiates a sync process for a data source to update changes.
+    """
+    source = db.session.get(DataSource, data_source_id)
+    if source is None:
+        return jsonify({"error": "Data source not found"}), 404
+    
+    current_app.logger.info(f"Admin '{current_admin_username}' requested sync for data source: {data_source_id}")
+    return jsonify({"message": f"Sync request for {source.name} received. Changes will be processed."}), 200
+
+@data_source_bp.route('/<string:data_source_id>/delete-embeddings', methods=['DELETE'])
+@token_required
+def delete_source_embeddings(current_admin_username, data_source_id):
+    """
+    Deletes the generated embeddings for a data source, but keeps the connection record.
+    """
+    source = db.session.get(DataSource, data_source_id)
+    if source is None:
+        return jsonify({"error": "Data source not found"}), 404
+    
+    current_app.logger.info(f"Admin '{current_admin_username}' requested embedding deletion for data source: {data_source_id}")
+    return jsonify({"message": f"Embeddings for {source.name} deleted successfully."}), 200

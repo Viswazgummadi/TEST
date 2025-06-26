@@ -61,11 +61,16 @@ def create_app(config_object_path='config.Config'):
     from .routes.admin_routes import admin_bp
     from .routes.chat_routes import chat_bp
     from .routes.data_source_routes import data_source_bp
+    from .routes.github_routes import github_bp # ✅ 1. IMPORT THE NEW BLUEPRINT
+    from .routes.google_routes import google_bp # ✅ 1. IMPORT THE NEW BLUEPRINT
+
 
     app.register_blueprint(general_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(chat_bp, url_prefix='/api/chat')
     app.register_blueprint(data_source_bp, url_prefix='/api/data-sources')
+    app.register_blueprint(github_bp, url_prefix='/api') # ✅ 2. REGISTER THE NEW BLUEPRINT
+    app.register_blueprint(google_bp, url_prefix='/api') # ✅ 2. REGISTER THE NEW BLUEPRINT
 
     app.logger.info("Flask app created and configured.")
     return app

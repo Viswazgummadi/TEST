@@ -33,12 +33,15 @@ class APIKey(db.Model):
     service_name = db.Column(db.String(100), unique=True, nullable=False)
     key_value_encrypted = db.Column(db.String(512), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) # ✅ ADD THIS LINE
 
     def to_dict(self):
         return {
             'id': self.id,
             'service_name': self.service_name,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat() # ✅ (Optional but good practice) ADD THIS LINE
+
         }
 
 class ConfiguredModel(db.Model):
@@ -54,7 +57,8 @@ class ConfiguredModel(db.Model):
     api_key_name_ref = db.Column(db.String(100), db.ForeignKey('api_keys.service_name'), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     notes = db.Column(db.Text, nullable=True)
-    
+    context_window = db.Column(db.Integer, nullable=True) # ✅ ADD THIS LINE
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -67,6 +71,7 @@ class ConfiguredModel(db.Model):
             'api_key_name_ref': self.api_key_name_ref,
             'is_active': self.is_active,
             'notes': self.notes,
+            'context_window': self.context_window, # ✅ AND ADD THIS LINE
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
