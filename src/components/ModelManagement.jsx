@@ -1,35 +1,8 @@
-// src/components/ModelManagement.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAdmin } from '../context/AdminContext'; // Path relative to this file
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAdmin } from '../context/AdminContext';
 import { FiPlusCircle, FiEdit, FiTrash2, FiToggleLeft, FiToggleRight, FiRefreshCw } from 'react-icons/fi';
 import { AnimatePresence, motion } from 'framer-motion';
-
-// Basic fetchApi utility specific to this component for now
-// In a larger app, you'd have a shared one in src/utils/api.js
-const fetchApiUtilForModels = async (url, options = {}, adminToken) => {
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-    };
-    if (adminToken) {
-        headers['Authorization'] = `Bearer ${adminToken}`;
-    }
-
-    const response = await fetch(`http://localhost:5001${url}`, {
-        ...options,
-        headers,
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ msg: `HTTP error! status: ${response.status}` }));
-        throw new Error(errorData.msg || errorData.error || `HTTP error! status: ${response.status}`);
-    }
-    if (response.status === 204 || response.headers.get("content-length") === "0") {
-        return null;
-    }
-    return response.json();
-};
-
+import createFetchApi from '../utils/api';
 
 const ModelForm = ({ existingModel, onSave, onCancel, availableApiKeys, modelSuggestions, isLoading }) => {
     const [formData, setFormData] = useState({
@@ -55,7 +28,7 @@ const ModelForm = ({ existingModel, onSave, onCancel, availableApiKeys, modelSug
             setSelectedSuggestionId('');
         } else {
             setFormData({ model_id_string: '', display_name: '', provider: '', api_key_name_ref: '', is_active: true, notes: '' });
-            setSelectedSuggestionId(''); // Clear suggestion on new form
+            setSelectedSuggestionId('');
         }
     }, [existingModel]);
 
@@ -70,7 +43,7 @@ const ModelForm = ({ existingModel, onSave, onCancel, availableApiKeys, modelSug
                 model_id_string: selected.id,
                 display_name: selected.name,
                 provider: selected.provider,
-                notes: selected.notes || prev.notes || '', // Use suggestion notes or existing or empty
+                notes: selected.notes || prev.notes || '',
                 api_key_name_ref: availableApiKeys.find(key => key.service_name === selected.default_api_key_placeholder)?.service_name || prev.api_key_name_ref || '',
                 is_active: true,
             }));
@@ -100,7 +73,7 @@ const ModelForm = ({ existingModel, onSave, onCancel, availableApiKeys, modelSug
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="bg-slate-800 p-6 rounded-lg shadow-xl border border-slate-700 mb-8" // Added mb-8
+            className="bg-slate-800 p-6 rounded-lg shadow-xl border border-slate-700 mb-8"
         >
             <h3 className="text-xl font-semibold text-white mb-6">
                 {existingModel ? 'Edit Model Configuration' : 'Add New Model Configuration'}
@@ -119,7 +92,6 @@ const ModelForm = ({ existingModel, onSave, onCancel, availableApiKeys, modelSug
                         </select>
                     </div>
                 )}
-                {/* Form fields: Model ID, Display Name, etc. ... (As in previous complete ModelForm) ... */}
                 <div><label htmlFor="model_id_string" className={labelClass}>Model ID (Provider Specific)</label><input type="text" name="model_id_string" id="model_id_string" value={formData.model_id_string} onChange={handleChange} required className={inputClass} /></div>
                 <div><label htmlFor="display_name" className={labelClass}>Display Name</label><input type="text" name="display_name" id="display_name" value={formData.display_name} onChange={handleChange} required className={inputClass} /></div>
                 <div><label htmlFor="provider" className={labelClass}>Provider</label><input type="text" name="provider" id="provider" value={formData.provider} onChange={handleChange} required placeholder="e.g., Google, OpenAI" className={inputClass} /></div>
@@ -136,38 +108,40 @@ const ModelForm = ({ existingModel, onSave, onCancel, availableApiKeys, modelSug
     );
 };
 
-
-const ModelManagement = () => {
-    const { token: adminToken } = useAdmin(); // Destructure token from useAdmin and rename for clarity
+const ModelManagement = ({ apiBaseUrl }) => {
+    const { token: adminToken } = useAdmin();
     const [configuredModels, setConfiguredModels] = useState([]);
     const [modelSuggestions, setModelSuggestions] = useState([]);
-    const [availableApiKeys, setAvailableApiKeys] = useState([]); // This will hold [{service_name: '...'}, ...]
+    const [availableApiKeys, setAvailableApiKeys] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [editingModel, setEditingModel] = useState(null);
 
+    const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
+
     const fetchAllData = useCallback(async () => {
         if (!adminToken) return;
-        setIsLoading(true); setError(null);
+        setIsLoading(true);
+        setError(null);
         try {
             const [modelsData, suggestionsData, apiKeysData] = await Promise.all([
-                fetchApiUtilForModels('/api/admin/configured-models', {}, adminToken),
-                fetchApiUtilForModels('/api/admin/model-suggestions', {}, adminToken),
-                fetchApiUtilForModels('/api/admin/settings/apikeys', {}, adminToken) // Fetches API keys
+                fetchApi('/api/admin/configured-models/', { token: adminToken }),
+                fetchApi('/api/admin/model-suggestions/', { token: adminToken }),
+                fetchApi('/api/admin/settings/apikeys/', { token: adminToken })
             ]);
             setConfiguredModels(modelsData || []);
             setModelSuggestions(suggestionsData || []);
-            setAvailableApiKeys(apiKeysData || []); // Store the fetched API keys
+            setAvailableApiKeys(apiKeysData || []);
         } catch (err) {
             setError(err.message);
-            // Clear data on error to avoid stale display
             setConfiguredModels([]);
             setModelSuggestions([]);
             setAvailableApiKeys([]);
+        } finally {
+            setIsLoading(false);
         }
-        finally { setIsLoading(false); }
-    }, [adminToken]);
+    }, [adminToken, fetchApi]);
 
     useEffect(() => {
         fetchAllData();
@@ -175,6 +149,7 @@ const ModelManagement = () => {
 
     const handleAddNew = () => { setEditingModel(null); setShowForm(true); };
     const handleEdit = (model) => { setEditingModel(model); setShowForm(true); };
+    const handleCancelForm = () => { setShowForm(false); setEditingModel(null); setError(null); };
 
     const handleSaveModel = async (formData, modelIdToUpdate) => {
         if (!adminToken) {
@@ -182,32 +157,19 @@ const ModelManagement = () => {
             return;
         }
         setIsLoading(true);
-        setError(null); // Clear previous errors
+        setError(null);
 
-        const isEditing = !!modelIdToUpdate; // True if we are editing, false if adding
-        const url = isEditing ? `/api/admin/configured-models/${modelIdToUpdate}` : '/api/admin/configured-models';
+        const isEditing = !!modelIdToUpdate;
+        const url = isEditing ? `/api/admin/configured-models/${modelIdToUpdate}` : '/api/admin/configured-models/';
         const method = isEditing ? 'PUT' : 'POST';
 
-        console.log(`Saving model. Editing: ${isEditing}, URL: ${url}, Method: ${method}, Payload:`, formData); // For debugging
-
         try {
-            const response = await fetchApiUtilForModels(url, { method, body: JSON.stringify(formData) }, adminToken);
-
-            // Log success or response if any (POST usually returns the created object, PUT might return updated or 200 OK)
-            console.log('Save model response:', response);
-
-            // This block should execute if the API call was successful (no error thrown by fetchApiUtilForModels)
+            await fetchApi(url, { method, body: JSON.stringify(formData), token: adminToken });
             setShowForm(false);
-            setEditingModel(null); // Reset editing state
-            await fetchAllData(); // Explicitly await to ensure data is fetched before isLoading is set to false too early by finally
-
-            // Optionally, provide success feedback (e.g., toast notification)
-            // alert(isEditing ? "Model updated successfully!" : "Model added successfully!");
-
+            setEditingModel(null);
+            await fetchAllData();
         } catch (err) {
-            console.error(`Error ${isEditing ? 'updating' : 'adding'} model:`, err);
-            setError(err.message || `Failed to ${isEditing ? 'update' : 'add'} model.`);
-            // Keep form open on error for user to see/fix
+            setError(err.message);
         } finally {
             setIsLoading(false);
         }
@@ -215,34 +177,41 @@ const ModelManagement = () => {
 
     const handleDeleteModel = async (modelId) => {
         if (!adminToken || !window.confirm("Delete this model configuration?")) return;
-        setIsLoading(true); setError(null);
+        setIsLoading(true);
+        setError(null);
         try {
-            await fetchApiUtilForModels(`/api/admin/configured-models/${modelId}`, { method: 'DELETE' }, adminToken);
-            fetchAllData();
-        } catch (err) { setError(err.message); }
-        finally { setIsLoading(false); }
+            await fetchApi(`/api/admin/configured-models/${modelId}`, { method: 'DELETE', token: adminToken });
+            await fetchAllData();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleToggleActive = async (model) => {
         if (!adminToken) return;
         const payload = { ...model, is_active: !model.is_active };
-        // Remove id, created_at, updated_at from payload for PUT as backend might not expect them or handle them
         delete payload.id;
         delete payload.created_at;
         delete payload.updated_at;
 
-        setIsLoading(true); setError(null);
+        setIsLoading(true);
+        setError(null);
         try {
-            await fetchApiUtilForModels(`/api/admin/configured-models/${model.id}`, { method: 'PUT', body: JSON.stringify(payload) }, adminToken);
-            fetchAllData();
-        } catch (err) { setError(err.message); }
-        finally { setIsLoading(false); }
+            await fetchApi(`/api/admin/configured-models/${model.id}`, { method: 'PUT', body: JSON.stringify(payload), token: adminToken });
+            await fetchAllData();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     if (!adminToken && !isLoading) return <p className="text-red-400 text-center py-4">Admin token not found. Please log in.</p>;
 
     return (
-        <div className="p-0 md:p-0"> {/* Removed padding here, AdminSettingsPage can handle it */}
+        <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-medium text-indigo-400">Model Configurations</h2>
                 <div className="flex items-center space-x-2">
@@ -262,8 +231,8 @@ const ModelManagement = () => {
                         key={editingModel ? `edit-${editingModel.id}` : 'add-new'}
                         existingModel={editingModel}
                         onSave={handleSaveModel}
-                        onCancel={() => { setShowForm(false); setEditingModel(null); setError(null); }}
-                        availableApiKeys={availableApiKeys} /* Pass fetched API keys */
+                        onCancel={handleCancelForm}
+                        availableApiKeys={availableApiKeys}
                         modelSuggestions={modelSuggestions}
                         isLoading={isLoading}
                     />
@@ -279,8 +248,38 @@ const ModelManagement = () => {
 
             {!showForm && configuredModels.length > 0 && (
                 <div className="overflow-x-auto bg-slate-900/70 rounded-lg shadow border border-slate-700">
-                    {/* ... Table JSX as in previous complete ModelManagement ... */}
-                    <table className="min-w-full divide-y divide-slate-700"><thead className="bg-slate-800"><tr><th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Display Name</th><th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Model ID</th><th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Provider</th><th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">API Key Ref</th><th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th><th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider min-w-[100px]">Actions</th></tr></thead><tbody className="bg-slate-800/50 divide-y divide-slate-700">{configuredModels.map((model) => (<tr key={model.id} className="hover:bg-slate-700/50 transition-colors"><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{model.display_name}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 font-mono text-xs">{model.model_id_string}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{model.provider}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{model.api_key_name_ref}</td><td className="px-6 py-4 whitespace-nowrap text-sm"><button onClick={() => handleToggleActive(model)} className={`mr-2 p-1 rounded-full ${isLoading && 'opacity-50 cursor-not-allowed'}`} disabled={isLoading}>{model.is_active ? <FiToggleRight size={24} className="text-green-400" /> : <FiToggleLeft size={24} className="text-gray-500" />}</button><span className={model.is_active ? "text-green-400" : "text-gray-500"}>{model.is_active ? 'Active' : 'Inactive'}</span></td><td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2"><button onClick={() => handleEdit(model)} className="text-indigo-400 hover:text-indigo-300" title="Edit"><FiEdit size={18} /></button><button onClick={() => handleDeleteModel(model.id)} className="text-red-400 hover:text-red-300" title="Delete"><FiTrash2 size={18} /></button></td></tr>))}</tbody></table>
+                    <table className="min-w-full divide-y divide-slate-700">
+                        <thead className="bg-slate-800">
+                            <tr>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Display Name</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Model ID</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Provider</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">API Key Ref</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider min-w-[100px]">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-slate-800/50 divide-y divide-slate-700">
+                            {configuredModels.map((model) => (
+                                <tr key={model.id} className="hover:bg-slate-700/50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{model.display_name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 font-mono text-xs">{model.model_id_string}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{model.provider}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{model.api_key_name_ref}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <button onClick={() => handleToggleActive(model)} className={`mr-2 p-1 rounded-full ${isLoading && 'opacity-50 cursor-not-allowed'}`} disabled={isLoading}>
+                                            {model.is_active ? <FiToggleRight size={24} className="text-green-400" /> : <FiToggleLeft size={24} className="text-gray-500" />}
+                                        </button>
+                                        <span className={model.is_active ? "text-green-400" : "text-gray-500"}>{model.is_active ? 'Active' : 'Inactive'}</span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                        <button onClick={() => handleEdit(model)} className="text-indigo-400 hover:text-indigo-300" title="Edit"><FiEdit size={18} /></button>
+                                        <button onClick={() => handleDeleteModel(model.id)} className="text-red-400 hover:text-red-300" title="Delete"><FiTrash2 size={18} /></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
         </div>

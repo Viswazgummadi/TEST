@@ -1,5 +1,5 @@
 // src/pages/AdminSettingsPage.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAdmin } from "../context/AdminContext";
 import { FiKey, FiCpu, FiPlus, FiTrash2, FiEye, FiEyeOff, FiSave } from "react-icons/fi";
 // --- ADDED IMPORT FOR FRAMER MOTION ---
@@ -10,7 +10,7 @@ import ModelManagement from "../components/ModelManagement"; // Correct path is 
 import createFetchApi from "../utils/api";
 
 
-const AdminSettingsPage = () => {
+const AdminSettingsPage = ({ apiBaseUrl }) => {
   const { token } = useAdmin();
   const [activeTab, setActiveTab] = useState("apiKeys");
 
