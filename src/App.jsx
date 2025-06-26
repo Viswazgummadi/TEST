@@ -16,7 +16,7 @@ import UniversalHeader from "./components/UniversalHeader";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 
-const API_BASE_URL = 'http://localhost:5001';
+const API_BASE_URL = 'https://reploit-backend.onrender.com';
 
 function useNavigationDirection() {
   const { pathname } = useLocation();
