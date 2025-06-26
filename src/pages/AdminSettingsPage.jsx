@@ -7,22 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // --- Import ModelManagement component ---
 import ModelManagement from "../components/ModelManagement"; // Correct path is src/components/ModelManagement.jsx
-
-// fetchApi utility
-const fetchApi = async (url, options = {}) => {
-  const { token } = options;
-  const headers = { "Content-Type": "application/json", ...options.headers };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  const response = await fetch(`http://localhost:5001${url}`, { ...options, headers });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: "An unknown error occurred" }));
-    throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
-  }
-  if (response.status === 204 || response.headers.get("content-length") === "0") return null;
-  return response.json();
-};
+import createFetchApi from "../utils/api";
 
 
 const AdminSettingsPage = () => {
@@ -37,12 +22,13 @@ const AdminSettingsPage = () => {
   const [showKeyValue, setShowKeyValue] = useState(false);
   const [editingKeyName, setEditingKeyName] = useState(null);
 
+  const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
   const fetchKeys = useCallback(async () => {
     if (!token) return;
     setIsLoadingApiKeys(true);
     setApiKeyError(null);
     try {
-      const data = await fetchApi("/api/admin/settings/apikeys", { token });
+      const data = await fetchApi("/api/admin/settings/apikeys/", { token });
       setApiKeys(data || []);
     } catch (err) {
       setApiKeyError(err.message);
@@ -50,11 +36,15 @@ const AdminSettingsPage = () => {
     } finally {
       setIsLoadingApiKeys(false);
     }
-  }, [token]);
+  }, [token, fetchApi]); // ✅ Add fetchApi to dependency array
 
   useEffect(() => {
     if (activeTab === "apiKeys" && token) {
       fetchKeys();
+    }
+    else {
+      // If not on API keys tab or no token, don't show loading
+      setIsLoadingApiKeys(false);
     }
   }, [token, activeTab, fetchKeys]);
 
@@ -67,12 +57,12 @@ const AdminSettingsPage = () => {
     setIsLoadingApiKeys(true);
     setApiKeyError(null);
     try {
-      await fetchApi("/api/admin/settings/apikeys", {
+      await fetchApi("/api/admin/settings/apikeys/", {
         method: "POST", token,
         body: JSON.stringify({ service_name: newServiceName.trim(), key_value: newKeyValue.trim() }),
       });
       setNewServiceName(""); setNewKeyValue(""); setShowKeyValue(false); setEditingKeyName(null);
-      fetchKeys();
+      await fetchKeys(); // Re-fetch the keys list after adding/updating
     } catch (err) {
       setApiKeyError(err.message);
     } finally {
@@ -87,7 +77,7 @@ const AdminSettingsPage = () => {
     try {
       const encodedServiceName = encodeURIComponent(serviceName);
       await fetchApi(`/api/admin/settings/apikeys/${encodedServiceName}`, { method: "DELETE", token });
-      fetchKeys();
+      await fetchKeys(); // Re-fetch the keys list after deleting
     } catch (err) {
       setApiKeyError(err.message);
     } finally {
@@ -151,9 +141,10 @@ const AdminSettingsPage = () => {
               <div className="flex justify-end space-x-3 pt-2">{editingKeyName && (<button type="button" onClick={() => { setEditingKeyName(null); setNewServiceName(""); setNewKeyValue(""); setApiKeyError(null); }} className="px-4 py-2 border border-slate-600 rounded-md text-sm font-medium text-gray-300 hover:bg-slate-700 focus:outline-none">Cancel Edit</button>)}<button type="submit" disabled={isLoadingApiKeys} className="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-indigo-500 disabled:opacity-50 flex items-center">{isLoadingApiKeys ? ("Saving...") : editingKeyName ? (<FiSave className="mr-2" />) : (<FiPlus className="mr-2" />)}{editingKeyName ? "Update Key" : "Add Key"}</button></div>
             </form>
             <div>
-              {isLoadingApiKeys && apiKeys.length === 0 && <p className="text-center">Loading keys...</p>}
-              {!isLoadingApiKeys && apiKeyError && apiKeys.length === 0 && <p className="text-center text-red-400">Error: {apiKeyError}</p>}
+              {isLoadingApiKeys && apiKeys.length === 0 && <p className="text-center text-lg text-gray-400">Loading keys...</p>}
+              {!isLoadingApiKeys && apiKeyError && <p className="text-center text-red-400">Error: {apiKeyError}</p>}
               {!isLoadingApiKeys && apiKeys.length === 0 && !apiKeyError && (<p className="text-center text-gray-400">No API keys configured yet.</p>)}
+
               {apiKeys.length > 0 && (<ul className="space-y-3 max-w-3xl mx-auto">{apiKeys.map((key) => (<li key={key.service_name} className="p-4 bg-slate-800/50 backdrop-blur-sm rounded-lg shadow-lg flex items-center justify-between"><div className="flex-grow min-w-0"><div className="flex items-center"><FiKey className="mr-3 text-indigo-400 flex-shrink-0" size={18} /><span className="font-medium text-gray-100 truncate" title={key.service_name}>{key.service_name}</span></div><p className="text-xs text-gray-400 mt-1">Last updated: {new Date(key.updated_at).toLocaleString()}</p></div><div className="space-x-2 flex-shrink-0 ml-4"><button onClick={() => startEditKey(key)} className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-md transition-colors" title="Edit (Re-enter key value)"><FiSave size={18} /></button><button onClick={() => handleDeleteKey(key.service_name)} disabled={isLoadingApiKeys} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50" title="Delete Key"><FiTrash2 size={18} /></button></div></li>))}</ul>)}
             </div>
           </motion.div>
@@ -167,7 +158,7 @@ const AdminSettingsPage = () => {
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.3 }}
           >
-            <ModelManagement />
+            <ModelManagement apiBaseUrl={apiBaseUrl} />
           </motion.div>
         )}
       </AnimatePresence>

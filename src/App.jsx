@@ -85,7 +85,7 @@ function AppRoutes({ sourceFilter, repoFilter, dataSources, isLoadingSources, ha
         />
 
         <Route path="/admin" element={<ProtectedRoute />}>
-          <Route path="settings" element={<AdminSettingsPage />} />
+          <Route path="settings" element={<AdminSettingsPage apiBaseUrl={apiBaseUrl} />} /> 
           <Route
             path="repos"
             element={
