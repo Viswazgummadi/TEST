@@ -6,9 +6,9 @@ from app import create_app, db, bcrypt
 from app.models.models import AdminUser
 import os
 
-app = create_app()
+app = create_app() # This line is what Gunicorn will import and run
 
-# --- Flask CLI Commands ---
+# --- Flask CLI Commands (these are fine to keep, they won't run automatically on server start) ---
 @app.cli.command("create-admin")
 def create_admin_command():
     """Creates or updates the admin user based on .env configuration."""
@@ -41,5 +41,8 @@ def create_admin_command():
             db.session.rollback()
             print(f"Error during create-admin: {e}")
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+# The `if __name__ == '__main__':` block is removed/commented out for production deployment.
+# You will use 'gunicorn run:app' to start your application in production.
+# For local development, you can still run 'flask run' or 'python -m flask run'
+# if you set FLASK_APP=run.py, or temporarily add this block back if you prefer.
+# However, using `flask run` is often simpler for local dev once you have FLASK_APP set.

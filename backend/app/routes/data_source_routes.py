@@ -138,3 +138,7 @@ def delete_source_embeddings(current_admin_username, data_source_id):
     
     current_app.logger.info(f"Admin '{current_admin_username}' requested embedding deletion for data source: {data_source_id}")
     return jsonify({"message": f"Embeddings for {source.name} deleted successfully."}), 200
+@data_source_bp.route('/test', methods=['GET'])
+def test_route():
+    current_app.logger.info("Test route hit!")
+    return jsonify({"message": "Test successful!"}), 200
