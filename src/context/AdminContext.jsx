@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo } from "react"; // ✅ Add useMemo
+import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "../navigation.js";
 
@@ -21,7 +21,6 @@ export const AdminProvider = ({ children, apiBaseUrl }) => {
   const location = useLocation();
 
   // ✅ Create the fetchApi function using the provided apiBaseUrl
-  // useMemo ensures this function is only re-created if apiBaseUrl changes
   const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
   useEffect(() => {
@@ -38,20 +37,17 @@ export const AdminProvider = ({ children, apiBaseUrl }) => {
     setIsLoading(true);
     setError(null);
     try {
-      // ✅ Use the new centralized fetchApi instance
-      const data = await fetchApi("/api/admin/login", {
+      // ✅ Add trailing slash here
+      const data = await fetchApi("/api/admin/login/", {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
 
-      // fetchApi already handles response.ok and parsing JSON,
-      // so 'data' will either be the successful JSON or an error thrown.
       setToken(data.token);
       setIsLoading(false);
       return true;
     } catch (err) {
       console.error("Login error:", err);
-      // The error message from fetchApi should be more informative
       setError(err.message);
       setIsLoading(false);
       setToken(null);

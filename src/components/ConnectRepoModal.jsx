@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'; // ✅ Add useMemo
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { FiGithub, FiX, FiLoader, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,7 +22,8 @@ const ConnectRepoModal = ({ isOpen, onClose, onConnectSuccess, apiBaseUrl }) => 
         setIsLoading(true);
         setError(null);
         try {
-            const data = await fetchApi('/api/connect/github/available-repos', { token });
+            // ✅ Add trailing slash here
+            const data = await fetchApi('/api/connect/github/available-repos/', { token });
             setRepos(data || []);
         } catch (err) {
             setError(err.message);
@@ -49,7 +50,8 @@ const ConnectRepoModal = ({ isOpen, onClose, onConnectSuccess, apiBaseUrl }) => 
                     is_private: repo.private,
                 }
             };
-            await fetchApi('/api/data-sources/connect', {
+            // ✅ Add trailing slash here
+            await fetchApi('/api/data-sources/connect/', {
                 method: 'POST',
                 token,
                 body: JSON.stringify(payload)

@@ -122,10 +122,11 @@ function AppContent() {
 
   const fetchApi = useMemo(() => createFetchApi(API_BASE_URL), []);
 
-  const fetchSources = useCallback(async () => { // This is line 125, which uses useCallback
+  const fetchSources = useCallback(async () => {
     setIsLoadingSources(true);
     try {
-      const sources = await fetchApi('/api/data-sources');
+      // ✅ Add trailing slash here
+      const sources = await fetchApi('/api/data-sources/');
       setDataSources(sources);
     } catch (error) {
       console.error("Error fetching data sources:", error);
@@ -148,7 +149,8 @@ function AppContent() {
       return;
     }
     try {
-      await fetchApi(`/api/data-sources/${sourceIdToDelete}`, {
+      // ✅ Ensure trailing slash in dynamic routes if the backend expects it
+      await fetchApi(`/api/data-sources/${sourceIdToDelete}`, { // Flask's DELETE route does NOT have trailing slash for the ID
         method: 'DELETE',
         token: token
       });

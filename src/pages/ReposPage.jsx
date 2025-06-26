@@ -1,6 +1,6 @@
 // src/pages/ReposPage.jsx
 
-import { useState, useEffect, useCallback, useMemo } from "react"; // ✅ Add useMemo
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useAdmin } from '../context/AdminContext';
 import RepoList from "../components/RepoList";
@@ -31,6 +31,7 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
 
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
+    // This logic should also point to the deployed Vercel frontend URL once live
     if (queryParams.get('gauth') === 'success') {
       setIsGoogleModalOpen(true);
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -56,9 +57,9 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
 
   const handleGoogleConnectClick = async () => {
     try {
-      // ✅ Use the new fetchApi instance
-      const data = await fetchApi('/api/connect/google/auth-url', {
-        token: token // Pass token in the options object as fetchApi expects
+      // ✅ Add trailing slash here
+      const data = await fetchApi('/api/connect/google/auth-url/', {
+        token: token
       });
       window.location.href = data.authorization_url;
     } catch (error) {
@@ -69,7 +70,8 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
   const handleReindexSource = useCallback(async (sourceId) => {
     if (!token || !window.confirm("Are you sure you want to re-index this source? This will re-process all its content.")) return;
     try {
-      await fetchApi(`/api/data-sources/${sourceId}/reindex`, { method: 'POST', token });
+      // ✅ Add trailing slash here
+      await fetchApi(`/api/data-sources/${sourceId}/reindex/`, { method: 'POST', token });
       alert("Re-indexing initiated!");
       if (onDataSourceAdded) onDataSourceAdded();
     } catch (error) {
@@ -80,7 +82,8 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
   const handleSyncSource = useCallback(async (sourceId) => {
     if (!token || !window.confirm("Are you sure you want to sync changes for this source?")) return;
     try {
-      await fetchApi(`/api/data-sources/${sourceId}/sync`, { method: 'POST', token });
+      // ✅ Add trailing slash here
+      await fetchApi(`/api/data-sources/${sourceId}/sync/`, { method: 'POST', token });
       alert("Sync initiated!");
       if (onDataSourceAdded) onDataSourceAdded();
     } catch (error) {
@@ -91,7 +94,8 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
   const handleDeleteEmbeddings = useCallback(async (sourceId) => {
     if (!token || !window.confirm("Are you sure you want to delete embeddings for this source? This will remove all AI knowledge but keep the connection record.")) return;
     try {
-      await fetchApi(`/api/data-sources/${sourceId}/delete-embeddings`, { method: 'DELETE', token });
+      // ✅ Add trailing slash here
+      await fetchApi(`/api/data-sources/${sourceId}/delete-embeddings/`, { method: 'DELETE', token });
       alert("Embeddings deleted!");
       if (onDataSourceAdded) onDataSourceAdded();
     } catch (error) {
@@ -148,13 +152,13 @@ const ReposPage = ({ isAdminView, sourceFilter, dataSources, isLoading, onDelete
         isOpen={isGithubModalOpen}
         onClose={() => setIsGithubModalOpen(false)}
         onConnectSuccess={handleConnectSuccess}
-        apiBaseUrl={apiBaseUrl} // Pass apiBaseUrl to ConnectRepoModal
+        apiBaseUrl={apiBaseUrl}
       />
       <GoogleFilesModal
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}
         onConnectSuccess={handleConnectSuccess}
-        apiBaseUrl={apiBaseUrl} // Pass apiBaseUrl to GoogleFilesModal
+        apiBaseUrl={apiBaseUrl}
       />
     </>
   );
