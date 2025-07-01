@@ -1,5 +1,4 @@
 // src/App.jsx
-// ✅ CORRECTED IMPORT: Ensure useCallback is included here
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, MotionConfig, AnimatePresence } from "framer-motion";
 import { Route, Routes, useLocation } from "react-router-dom";
@@ -17,11 +16,11 @@ import UniversalHeader from "./components/UniversalHeader";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 
-// ✅ CRUCIAL: REPLACE THIS WITH YOUR ACTUAL RENDER BACKEND URL
-const API_BASE_URL = 'https://reploit-backend.onrender.com'; // <<< YOUR RENDER BACKEND URL HERE!
+const API_BASE_URL = 'http://127.0.0.1:5000'; // Or your Render URL
 
-// ✅ Import the new centralized fetchApi utility
 import createFetchApi from "./utils/api";
+
+const LAST_SELECTED_REPO_KEY = "lastSelectedRepoId";
 
 function useNavigationDirection() {
   const { pathname } = useLocation();
@@ -86,7 +85,7 @@ function AppRoutes({ sourceFilter, repoFilter, dataSources, isLoadingSources, ha
         />
 
         <Route path="/admin" element={<ProtectedRoute />}>
-          <Route path="settings" element={<AdminSettingsPage apiBaseUrl={apiBaseUrl} />} /> 
+          <Route path="settings" element={<AdminSettingsPage apiBaseUrl={apiBaseUrl} />} />
           <Route
             path="repos"
             element={
@@ -117,29 +116,55 @@ function AppContent() {
   const { token } = useAdmin();
 
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [repoFilter, setRepoFilter] = useState(() => {
+    const savedRepoId = localStorage.getItem(LAST_SELECTED_REPO_KEY);
+    return savedRepoId || "";
+  });
   const [dataSources, setDataSources] = useState([]);
   const [isLoadingSources, setIsLoadingSources] = useState(true);
-  const [repoFilter, setRepoFilter] = useState("");
 
   const fetchApi = useMemo(() => createFetchApi(API_BASE_URL), []);
 
   const fetchSources = useCallback(async () => {
     setIsLoadingSources(true);
     try {
-      // ✅ Add trailing slash here
-      const sources = await fetchApi('/api/data-sources/');
+      const sources = await fetchApi('/api/data-sources/', { token: token });
       setDataSources(sources);
+
+      if (repoFilter && !sources.some(source => source.id === repoFilter)) {
+        setRepoFilter("");
+        localStorage.removeItem(LAST_SELECTED_REPO_KEY);
+      }
+
     } catch (error) {
       console.error("Error fetching data sources:", error);
       setDataSources([]);
+      setRepoFilter("");
+      localStorage.removeItem(LAST_SELECTED_REPO_KEY);
     } finally {
       setIsLoadingSources(false);
     }
-  }, [fetchApi]);
+  }, [fetchApi, token, repoFilter]);
 
   useEffect(() => {
-    fetchSources();
-  }, [fetchSources]);
+    if (token) {
+      fetchSources();
+    } else {
+      setDataSources([]);
+      setIsLoadingSources(false);
+      setRepoFilter("");
+      localStorage.removeItem(LAST_SELECTED_REPO_KEY);
+    }
+  }, [fetchSources, token]);
+
+  useEffect(() => {
+    if (repoFilter) {
+      localStorage.setItem(LAST_SELECTED_REPO_KEY, repoFilter);
+    } else {
+      localStorage.removeItem(LAST_SELECTED_REPO_KEY);
+    }
+  }, [repoFilter]);
+
 
   const handleDeleteSource = useCallback(async (sourceIdToDelete) => {
     if (!window.confirm("Are you sure you want to delete this source? This action cannot be undone.")) {
@@ -150,20 +175,28 @@ function AppContent() {
       return;
     }
     try {
-      // ✅ Ensure trailing slash in dynamic routes if the backend expects it
-      await fetchApi(`/api/data-sources/${sourceIdToDelete}`, { // Flask's DELETE route does NOT have trailing slash for the ID
+      await fetchApi(`/api/data-sources/${sourceIdToDelete}`, {
         method: 'DELETE',
         token: token
       });
-      setDataSources(prevSources => prevSources.filter(source => source.id !== sourceIdToDelete));
+      // Instead of manually filtering, just trigger a refetch to get the latest state
+      fetchSources();
+      if (repoFilter === sourceIdToDelete) {
+        setRepoFilter("");
+      }
     } catch (error) {
       console.error("Error deleting source:", error);
       alert(`Deletion Failed: ${error.message}`);
     }
-  }, [token, fetchApi]);
+  }, [token, fetchApi, repoFilter, fetchSources]); // Add fetchSources to dependency array
 
   const location = useLocation();
   const isChatPage = location.pathname === "/chat";
+
+  // --- NEW: Create a filtered list of repos for the chat selector ---
+  const chatReadyRepos = useMemo(() => {
+    return dataSources.filter(source => source.status === 'indexed' || source.status === 'outdated');
+  }, [dataSources]);
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-purple-800 via-blue-900 to-slate-950 text-gray-200">
@@ -175,13 +208,15 @@ function AppContent() {
             onSourceChange={setSourceFilter}
             repoFilter={repoFilter}
             onRepoChange={setRepoFilter}
-            repos={dataSources}
+            // MODIFIED: Pass the correct list of repos based on the page
+            repos={location.pathname.startsWith('/admin') ? dataSources : chatReadyRepos}
           />
           <main className={isChatPage ? "flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col min-h-0" : "w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"}>
             <AppRoutes
               sourceFilter={sourceFilter}
               repoFilter={repoFilter}
-              dataSources={dataSources}
+              // Pass down the correct list based on the context
+              dataSources={location.pathname.startsWith('/admin') ? dataSources : chatReadyRepos}
               isLoadingSources={isLoadingSources}
               handleDeleteSource={handleDeleteSource}
               onDataSourceAdded={fetchSources}

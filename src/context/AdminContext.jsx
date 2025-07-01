@@ -1,17 +1,17 @@
+// src/context/AdminContext.jsx
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "../navigation.js";
 
-// ✅ Import the new centralized fetchApi utility
 import createFetchApi from "../utils/api";
 
 const AdminContext = createContext();
 
 export const useAdmin = () => useContext(AdminContext);
 
-// ✅ AdminProvider now accepts apiBaseUrl as a prop
 export const AdminProvider = ({ children, apiBaseUrl }) => {
   const [isAdmin, setIsAdmin] = useState(false);
+  // Correctly initialize token from "adminToken"
   const [token, setToken] = useState(
     localStorage.getItem("adminToken") || null
   );
@@ -20,15 +20,14 @@ export const AdminProvider = ({ children, apiBaseUrl }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ Create the fetchApi function using the provided apiBaseUrl
   const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
   useEffect(() => {
     if (token) {
-      localStorage.setItem("adminToken", token);
+      localStorage.setItem("adminToken", token); // Always save to "adminToken"
       setIsAdmin(true);
     } else {
-      localStorage.removeItem("adminToken");
+      localStorage.removeItem("adminToken"); // Always remove from "adminToken"
       setIsAdmin(false);
     }
   }, [token]);
@@ -37,7 +36,6 @@ export const AdminProvider = ({ children, apiBaseUrl }) => {
     setIsLoading(true);
     setError(null);
     try {
-      // ✅ Add trailing slash here
       const data = await fetchApi("/api/admin/login/", {
         method: "POST",
         body: JSON.stringify({ username, password }),

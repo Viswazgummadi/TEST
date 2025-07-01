@@ -1,4 +1,5 @@
 // src/components/UniversalHeader.jsx
+// (No changes needed here. It already correctly uses repoFilter and onRepoChange props from parent.)
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, Link } from "react-router-dom";
@@ -9,7 +10,6 @@ import { MdSchedule, MdManageHistory, MdFolderSpecial } from "react-icons/md";
 import { FiGithub, FiFolder, FiBox, FiDatabase, FiMessageSquare } from "react-icons/fi";
 import { SiGoogledrive } from "react-icons/si";
 
-// ✅ CORRECTED: Use 'google_drive' as the ID to match backend source_type
 const repoSourceOptions = [
   { id: "all", name: "All Sources", icon: FiDatabase },
   { id: "github", name: "GitHub", icon: FiGithub },
@@ -24,7 +24,6 @@ const HomeControls = () => {
       <a href="https://github.com/Viswazgummadi/Reploit.git" target="_blank" rel="noopener noreferrer" className={`transition-colors ${hoverClass}`}>code</a>
       <Link to="/implementation" className={`transition-colors ${hoverClass}`}>explore</Link>
       <Link to="/deployment" className={`transition-colors ${hoverClass}`}>deploy</Link>
-      {/* This link should correctly point to the public /repos page */}
       <Link to="/repos" className={`transition-colors ${hoverClass}`}>test</Link>
     </nav>
   );
@@ -37,13 +36,11 @@ const AppControls = ({ selectorProps }) => {
 
   let ContextualIcon, contextualLink;
   if (onHistoryPage) {
-    // If on history page, link to the public repos page for users, or admin repos for admins
     contextualLink = isAdmin ? "/admin/repos" : "/repos";
-    ContextualIcon = isAdmin ? MdFolderSpecial : FiFolder; // Icon for repos page
+    ContextualIcon = isAdmin ? MdFolderSpecial : FiFolder;
   } else {
-    // If not on history page, link to the history page (admin or public)
     contextualLink = isAdmin ? "/admin/history" : "/history";
-    ContextualIcon = isAdmin ? MdManageHistory : MdSchedule; // Icon for history page
+    ContextualIcon = isAdmin ? MdManageHistory : MdSchedule;
   }
 
   return (
@@ -72,11 +69,9 @@ const UniversalHeader = (props) => {
   const { pathname } = useLocation();
   const { sourceFilter, onSourceChange, repoFilter, onRepoChange, repos } = props;
 
-  // ✅ UPDATED: Include both public and admin repos pages, plus admin settings
   const appStylePages = ["/repos", "/history", "/admin/history", "/chat", "/admin/repos", "/admin/settings"];
   const isAppStyleHeader = appStylePages.some((page) => pathname.startsWith(page));
 
-  // ✅ ADDED: Dynamic icons for individual repo options in the dropdown
   const liveRepoOptions = (repos || []).map((repo) => ({
     id: repo.id,
     name: repo.name,
@@ -89,33 +84,29 @@ const UniversalHeader = (props) => {
     const selectRepoPlaceholder = { id: "", name: "Select a Repo", icon: FiMessageSquare, disabled: true };
     selectorOptionsForPage = [selectRepoPlaceholder, ...liveRepoOptions];
   } else {
-    // This branch now serves both public /repos and /history pages
     const allReposOption = { id: "all", name: "All Repositories", icon: FiBox };
     selectorOptionsForPage = [allReposOption, ...liveRepoOptions];
   }
 
   let selectorProps = null;
 
-  // ✅ UPDATED: Check for both /repos and /admin/repos paths to show the source filter dropdown
   if (pathname === "/repos" || pathname.startsWith("/admin/repos")) {
     selectorProps = {
-      options: repoSourceOptions, // This is the source type filter (GitHub, Google Drive, All)
+      options: repoSourceOptions,
       selectedValue: sourceFilter,
       onChange: onSourceChange,
     };
   } else if (
-    // This branch handles the individual repo selector for chat and history pages
     pathname.startsWith("/chat") ||
     pathname.startsWith("/history") ||
     pathname.startsWith("/admin/history")
   ) {
     selectorProps = {
-      options: selectorOptionsForPage, // This is the individual repository filter
-      selectedValue: repoFilter,
-      onChange: onRepoChange,
+      options: selectorOptionsForPage,
+      selectedValue: repoFilter, // Uses the persisted repoFilter
+      onChange: onRepoChange, // Uses the setRepoFilter to persist
     };
   }
-  // If selectorProps is null (e.g., on /home or /admin/settings), AppControls will hide the selector.
 
   return (
     <header className="sticky top-0 z-40 p-3">
