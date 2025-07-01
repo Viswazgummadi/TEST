@@ -17,7 +17,8 @@ class AdminUser(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     is_admin = db.Column(db.Boolean, default=True, nullable=False)
-
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     # Relationships (Optional but good for clarity in ORM)
     chat_history = db.relationship('ChatHistory', backref='user', lazy=True)
     
