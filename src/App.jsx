@@ -16,7 +16,7 @@ import UniversalHeader from "./components/UniversalHeader";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 
-const API_BASE_URL = 'http://127.0.0.1:5000'; // Or your Render URL
+const API_BASE_URL = 'http://localhost:5000'; // Or your Render URL
 
 import createFetchApi from "./utils/api";
 
