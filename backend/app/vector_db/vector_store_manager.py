@@ -41,12 +41,8 @@ class VectorStoreManager:
             index = self.get_index()
             
             # 1. Embed the user's query using the same model we used for the documents.
-            query_embedding_result = genai.embed_content(
-                model="models/text-embedding-004",
-                content=query,
-                task_type="RETRIEVAL_QUERY" # Use 'RETRIEVAL_QUERY' type for queries
-            )
-            query_vector = query_embedding_result['embedding']
+            query_vector = self.embedding_model.embed_query(query) # Use the initialized model
+
 
             # 2. Query Pinecone for the most similar vectors within the specified namespace.
             query_results = index.query(
@@ -110,11 +106,12 @@ Now, generate docstrings for this list of functions:
         full_prompt = prompt + json.dumps(prompt_payload, indent=2)
 
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(full_prompt)
+    # Use the already initialized LangChain chat model for docstring generation
+    # For a single prompt, use .invoke()
+            response = self.chat_model.invoke(full_prompt) # Use the initialized chat_model
             
             # Clean the response to ensure it's valid JSON
-            cleaned_response = response.text.strip().replace("```json", "").replace("```", "").strip()
+            cleaned_response = response.content.strip().replace("```json", "").replace("```", "").strip()
             generated_docstrings = json.loads(cleaned_response)
 
             if isinstance(generated_docstrings, list) and len(generated_docstrings) == len(functions_to_document):
@@ -147,13 +144,7 @@ Now, generate docstrings for this list of functions:
             current_app.logger.info(f"Processing embedding batch {i // batch_size + 1} with {len(batch_texts)} items...")
 
             try:
-                # Call Gemini's Embedding API
-                result = genai.embed_content(
-                    model="models/text-embedding-004",
-                    content=batch_texts,
-                    task_type="RETRIEVAL_DOCUMENT"
-                )
-                embeddings = result['embedding']
+                embeddings = self.embedding_model.embed_documents(batch_texts) # Use the initialized model
             except Exception as e:
                 current_app.logger.error(f"Error calling Gemini Embedding API for batch {i // batch_size + 1}: {e}")
                 continue # Skip this batch if embedding fails

@@ -1,6 +1,6 @@
 # backend/app/routes/chat_routes.py
 from flask import Blueprint, request, jsonify, current_app, Response, stream_with_context, g
-# import google.generativeai as genai
+from langchain_google_genai import ChatGoogleGenerativeAI, HarmBlockThreshold, HarmCategory # ADD THIS LINE
 import json
 from flask_cors import CORS
 from langchain_core.messages import HumanMessage, AIMessage
@@ -137,34 +137,37 @@ def chat_handler(current_user_identity): # current_user_identity is passed by to
 
     try:
         if db_model_config.provider.lower() == "google":
-            if api_key_name_for_model and not decrypted_key:
-                 return jsonify({"error": "Google AI API key is required but was not processed correctly."}), 500
+            if not decrypted_key:
+                return jsonify({"error": "Google AI API key is required but was not processed correctly."}), 500
             
-            if api_key_name_for_model:
-                genai.configure(api_key=decrypted_key)
-            
-            model_instance = genai.GenerativeModel(db_model_config.model_id_string)
+            # Initialize LangChain's ChatGoogleGenerativeAI model
+            # Ensure the model_id_string from DB matches the LangChain model name (e.g., 'gemini-pro', 'gemini-1.5-flash')
+            # You might need to adjust safety settings if the default is too restrictive
+            model_instance = ChatGoogleGenerativeAI(
+                model=db_model_config.model_id_string,
+                google_api_key=decrypted_key,
+                # Optional: Configure safety settings if you encounter BlockedPromptException frequently
+                safety_settings={
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                }
+            )
             
             # TODO: In Phase 2, this is where you'd integrate LangGraph with retrieved history
             # For now, it's just passing the user_query directly
-            gemini_stream = model_instance.generate_content(user_query, stream=True)
+            gemini_stream = model_instance.stream(user_query) # Use .stream() method for direct streaming
 
             ai_response_chunks = [] # To accumulate AI response for saving
             def generate_stream_chunks():
                 nonlocal ai_response_chunks # Allow modification of outer variable
                 try:
                     for chunk in gemini_stream:
-                        if chunk.text:
-                            ai_response_chunks.append(chunk.text) # Accumulate chunks
-                            data_payload = json.dumps({"chunk": chunk.text})
+                        if chunk.content:
+                            ai_response_chunks.append(chunk.content) # Accumulate chunks
+                            data_payload = json.dumps({"chunk": chunk.content})
                             yield f"data: {data_payload}\n\n"
-                        if chunk.prompt_feedback and chunk.prompt_feedback.block_reason:
-                            error_payload = json.dumps({"error": f"Content blocked: {chunk.prompt_feedback.block_reason_message}"})
-                            yield f"data: {error_payload}\n\n"
-                            current_app.logger.warning(f"Gemini content blocked: {chunk.prompt_feedback.block_reason_message}")
-                            # Do not save blocked content as successful AI response
-                            ai_response_chunks = ["Content Blocked by AI Provider."] 
-                            return
 
                 except Exception as e:
                     current_app.logger.error(f"Error during Gemini stream generation: {e}", exc_info=True)
@@ -208,7 +211,7 @@ def chat_handler(current_user_identity): # current_user_identity is passed by to
             db.session.commit()
             return jsonify({"error": error_message}), 501
 
-    except genai.types.generation_types.BlockedPromptException as bpe:
+    except Exception as bpe:
         current_app.logger.error(f"Gemini request blocked for model {db_model_config.model_id_string}: {bpe}", exc_info=True)
         # Save blocked message to history
         new_ai_message_entry = ChatHistory(

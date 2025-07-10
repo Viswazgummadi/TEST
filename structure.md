@@ -26,8 +26,10 @@ reploit/
 │   │   │   └── repo_ingestion_task.py
 │   │   ├── utils/
 │   │   │   └── auth.py
+│   │   │   └── file_reader.py
 │   │   └── vector_db/
 │   │       └── vector_store_manager.py
+│   ├── celery_worker.py
 │   ├── config.py
 │   ├── instance/
 │   ├── migrations/

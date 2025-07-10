@@ -2,7 +2,7 @@
 
 from neo4j import GraphDatabase
 from flask import current_app
-from langchain.graphs import Neo4jGraph
+from langchain_community.graphs import Neo4jGraph
 from langchain.chains import GraphCypherQAChain
 from langchain_google_genai import ChatGoogleGenerativeAI
 # NEW: Import for building custom prompts
