@@ -123,3 +123,33 @@ class KnowledgeGraphManager:
         parameters = {"data_source_id": data_source_id}
         self.run_query(query, parameters)
         current_app.logger.info(f"KG: Cleared all graph data for data source {data_source_id}.")
+    def execute_and_summarize_cypher(self, cypher_query: str, state: dict) -> str:
+        """
+        Executes a raw Cypher query and uses an LLM to summarize the results.
+        """
+        current_app.logger.info(f"KG Manager: Executing raw cypher: {cypher_query}")
+        
+        # Execute the raw query
+        try:
+            with self._driver.session() as session:
+                result = session.run(cypher_query)
+                records = [record.data() for record in result]
+        except Exception as e:
+            return f"Failed to execute Cypher query. Error: {e}"
+
+        if not records:
+            return "The query executed successfully but returned no results."
+        from ..utils.llm_utils import get_llm_for_graph
+        # Use an LLM to summarize the raw JSON-like results
+        llm = get_llm_for_graph(state)
+        
+        prompt = PromptTemplate.from_template(
+            "You are a helpful assistant. Summarize the following raw database results into a concise, human-readable sentence. "
+            "Database Results:\n```json\n{results}\n```\n\nSummary:"
+        )
+
+        summarization_chain = prompt | llm
+        
+        summary = summarization_chain.invoke({"results": str(records)}).content
+        current_app.logger.info(f"KG Manager: Summarized results to: {summary}")
+        return summary

@@ -11,7 +11,7 @@ from ..models.models import APIKey, ConfiguredModel, DataSource, ChatHistory, Ad
 # ADDED: Import celery_app and the new tasks
 from backend.celery_worker import celery_app # Import from celery_worker directly
 from ..tasks.memory_tasks import generate_repo_summary_task, extract_user_facts_task
-from ..ai_core.agent import agent_graph # THIS IMPORT IS THE KEY
+from ..ai_core.graph import agent_graph # THIS IMPORT IS THE KEY
 from backend.app import db 
 
 chat_bp = Blueprint('chat_api_routes', __name__, url_prefix='/api/chat')
@@ -186,30 +186,41 @@ def chat_handler(current_user_identity):
 
     # --- Prepare input for the LangGraph agent ---
     agent_input_state = {
-        "messages": combined_messages_for_agent,
-        "data_source_id": data_source_id,
-        "api_key": llm_api_key,
-        "model_id": selected_model_id_from_frontend
+    "original_query": user_query,
+    "chat_history": combined_messages_for_agent, # Pass the full history
+    "final_answer": [], # Initialize as an empty list
+    "repo_id": data_source_id,
+    "session_id": session_id,
+    "api_key": llm_api_key,
+    "model_id": selected_model_id_from_frontend
     }
-
+# --- ADD THIS FINAL, CORRECT BLOCK ---
     try:
-        final_agent_output = None
-        for state_chunk in agent_graph.stream(agent_input_state):
-            final_agent_output = state_chunk
-
+        current_app.logger.info("Starting agent graph execution...")
         full_ai_response_content = ""
-        if final_agent_output and 'router' in final_agent_output and "messages" in final_agent_output['router']:
-            last_message_from_agent = final_agent_output['router']["messages"][-1]
-            if isinstance(last_message_from_agent, AIMessage):
-                full_ai_response_content = last_message_from_agent.content
-                current_app.logger.info(f"Retrieved full AI response from agent: {full_ai_response_content[:200]}...")
-            else:
-                current_app.logger.warning(f"Agent did not return an AIMessage as final response. Last message type: {type(last_message_from_agent)}. Message content: {getattr(last_message_from_agent, 'content', 'N/A')[:200]}")
+        final_state = agent_graph.invoke(agent_input_state, {"recursion_limit": 15})
+        # --- ALSO ADD THESE LINES ---
+        if final_state and "final_answer" in final_state and final_state["final_answer"]:
+            last_message = final_state["final_answer"][-1]
+            if isinstance(last_message, AIMessage):
+                full_ai_response_content = last_message.content
+                current_app.logger.info(f"SUCCESS: Final answer retrieved from completed graph.")
+        # This new loop inspects each state update as it happens.
+        # for state_chunk in agent_graph.stream(agent_input_state, {"recursion_limit": 15}):
+        #     # As soon as we see the 'final_answer' key appear, we grab it.
+        #     # This is robust because we capture the answer the moment it's created.
+        #     if "final_answer" in state_chunk and state_chunk["final_answer"]:
+        #         last_message = state_chunk["final_answer"][-1]
+        #         if isinstance(last_message, AIMessage):
+        #             full_ai_response_content = last_message.content
+        #             current_app.logger.info(f"SUCCESS: Final answer captured from graph stream.")
         
+        # If the loop finishes and we never found a final answer, use a fallback message.
         if not full_ai_response_content:
-            current_app.logger.warning("No AI response content found after agent graph execution (or it was an empty string). Setting default message.")
-            full_ai_response_content = "No response from AI."
-
+            current_app.logger.warning("Graph execution finished, but no 'final_answer' was ever produced.")
+            full_ai_response_content = "I was unable to produce a final answer based on the information I found."
+        
+        # The rest of the function for streaming the response and saving it is correct.
         ai_response_chunks = []
         def generate_stream_chunks():
             nonlocal ai_response_chunks
@@ -219,51 +230,29 @@ def chat_handler(current_user_identity):
                     data_payload = json.dumps({"chunk": char})
                     yield f"data: {data_payload}\n\n".encode('utf-8')
                     time.sleep(0.02)
-                
                 yield f"data: {json.dumps({'status': 'done'})}\n\n".encode('utf-8')
-
-            except Exception as e:
-                current_app.logger.error(f"Error during streaming simulation: {e}", exc_info=True)
-                error_payload = json.dumps({"error": f"Stream generation error: {str(e)}"})
-                yield f"data: {error_payload}\n\n".encode('utf-8')
-                ai_response_chunks = [f"Error: {str(e)}"]
             finally:
                 if ai_response_chunks:
                     final_save_content = "".join(ai_response_chunks)
                     new_ai_message_entry = ChatHistory(
-                        session_id=session_id,
-                        user_id=user.id,
-                        data_source_id=data_source_id,
-                        message_content=final_save_content,
-                        sender='llm'
+                        session_id=session_id, user_id=user.id, data_source_id=data_source_id,
+                        message_content=final_save_content, sender='llm'
                     )
                     db.session.add(new_ai_message_entry)
                     db.session.commit()
                     current_app.logger.info(f"AI response saved for session {session_id}.")
                     
-                    # --- ADDED: Dispatch Celery tasks for memory management ---
-                    try:
-                        celery_app.send_task(
-                            'backend.app.tasks.memory_tasks.generate_repo_summary_task',
-                            args=[user.id, data_source_id],
-                            kwargs={'last_chat_timestamp_str': new_ai_message_entry.timestamp.isoformat()},
-                            countdown=5 # Run after 5 seconds to allow DB commit to propagate
-                        )
-                        current_app.logger.info("Dispatched generate_repo_summary_task.")
-                    except Exception as task_e:
-                        current_app.logger.error(f"Failed to dispatch generate_repo_summary_task: {task_e}")
-
-                    try:
-                        celery_app.send_task(
-                            'backend.app.tasks.memory_tasks.extract_user_facts_task',
-                            args=[user.id],
-                            countdown=10 # Run after 10 seconds
-                        )
-                        current_app.logger.info("Dispatched extract_user_facts_task.")
-                    except Exception as task_e:
-                        current_app.logger.error(f"Failed to dispatch extract_user_facts_task: {task_e}")
-                    # --- END ADDED ---
-
+                    celery_app.send_task(
+                        'backend.app.tasks.memory_tasks.generate_repo_summary_task',
+                        args=[user.id, data_source_id],
+                        kwargs={'last_chat_timestamp_str': new_ai_message_entry.timestamp.isoformat()},
+                        countdown=5
+                    )
+                    celery_app.send_task(
+                        'backend.app.tasks.memory_tasks.extract_user_facts_task',
+                        args=[user.id],
+                        countdown=10
+                    )
 
         response = Response(stream_with_context(generate_stream_chunks()), mimetype='text/event-stream')
         response.headers.add("Cache-Control", "no-cache")
@@ -272,14 +261,5 @@ def chat_handler(current_user_identity):
         return response
 
     except Exception as e:
-        current_app.logger.error(f"An error occurred with the AI agent: {e}", exc_info=True)
-        new_ai_message_entry = ChatHistory(
-            session_id=session_id,
-            user_id=user.id,
-            data_source_id=data_source_id,
-            message_content=f"An error occurred with the AI agent: {str(e)}",
-            sender='llm'
-        )
-        db.session.add(new_ai_message_entry)
-        db.session.commit()
+        current_app.logger.error(f"A critical error occurred with the AI agent: {e}", exc_info=True)
         return jsonify({"error": f"An error occurred with the AI agent: {str(e)}"}), 502

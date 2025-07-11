@@ -12,7 +12,40 @@ from ..schemas.user_schema import UserFactSchema, UserFactsList, RepoSummarySche
 
 from ..models.models import db, ConfiguredModel, APIKey, ChatHistory, RepoConversationSummary, UserFact
 from .auth import decrypt_value
+def get_llm_for_graph(state: dict):
+    """
+    Initializes a ChatGoogleGenerativeAI instance for use within the LangGraph agent.
+    
+    It retrieves the model_id and api_key from the graph's state, which were 
+    originally passed in from chat_routes.py. This makes the graph self-contained
+    and allows it to use the specific model selected by the user on the frontend.
+    """
+    api_key = state.get("api_key")
+    model_id = state.get("model_id")
 
+    if not api_key:
+        # Fallback to environment variable if not in state (e.g., for testing)
+        api_key = os.environ.get("GEMINI_API_KEY")
+    
+    if not model_id:
+        # Fallback to a default model if not in state
+        model_id = "gemini-1.5-flash"
+    
+    if not api_key:
+        raise ValueError("Missing Gemini API Key. Provide it in the agent state or as GEMINI_API_KEY env var.")
+        
+    return ChatGoogleGenerativeAI(
+        model=model_id,
+        google_api_key=api_key,
+        temperature=0, # We want deterministic outputs for planning/reasoning
+        convert_system_message_to_human=True, # Important for some models
+        safety_settings={
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        },
+    )
 def _get_llm_for_utility_tasks():
     # ... (keep this function exactly as it is from the previous full code block)
     """

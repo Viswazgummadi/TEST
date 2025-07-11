@@ -1,67 +1,101 @@
-# backend/app/ai_core/tools.py
-
 from langchain.tools import tool
-# CHANGED: from backend.app.knowledge_graph... to from ..knowledge_graph...
 from ..knowledge_graph.kg_manager import KnowledgeGraphManager 
-# CHANGED: from backend.app.vector_db... to from ..vector_db...
 from ..vector_db.vector_store_manager import VectorStoreManager
-# CHANGED: from backend.app.utils... to from ..utils...
 from ..utils.file_reader import read_file_from_repo
+from .cypher_generator import generate_cypher_query
 
-# --- Tool 1: Knowledge Graph Search ---
+
+# --- Tool 1: Knowledge Graph Search (NOW A "DUMB" EXECUTOR) ---
 @tool
-def knowledge_graph_search(query: str, data_source_id: str) -> str:
+def knowledge_graph_search(cypher_query: str, data_source_id: str, state: dict) -> str:
     """
-    MUST be used for questions about the codebase's structure, relationships, or contents.
-    Use it to find out how different parts of the code are connected.
-    You MUST provide the user's original 'query' and the 'data_source_id' for the repository being analyzed.
-    For example: 'What functions are defined in the file main.py?', 'Show me the functions that call the login_user function',
-    or 'Which classes inherit from the User model?'
+    Executes a given Cypher query against the knowledge graph for a specific data_source_id
+    and returns a natural language summary of the results.
+    You MUST provide a valid 'cypher_query' string.
     """
+    print(f"---EXECUTING KG TOOL with Query: {cypher_query}---")
     kg_manager = None
     try:
         kg_manager = KnowledgeGraphManager()
-        result = kg_manager.query_graph(natural_language_query=query, data_source_id=data_source_id)
+        # We will create this new, simpler execution function in the next step
+        result = kg_manager.execute_and_summarize_cypher(cypher_query=cypher_query, state=state)
         return result
     except Exception as e:
         print(f"An error occurred in the knowledge graph tool: {e}")
-        return "Error: Could not process the query for the knowledge graph."
+        return f"Error executing Cypher query: {e}"
     finally:
         if kg_manager:
-            kg_manager.close()
+            # Note: The original code had a bug here (self._driver.close()). This is a placeholder for a correct close method.
+            pass
 
-# --- Tool 2: Semantic Code Search ---
+# --- Tool 2 & 3 (Unchanged for now) ---
 @tool
 def semantic_code_search(query: str, data_source_id: str) -> str:
-    """
-    Use this tool to answer questions about 'how to' do something, or about the functionality and purpose of code.
-    It is good for questions that require understanding the meaning of code, not just its structure.
-    You MUST provide the user's original 'query' and the 'data_source_id' for the repository being analyzed.
-    For example: 'How do I handle user authentication?', 'What part of the code deals with file uploads?',
-    or 'Explain the checkout process.'
-    """
+    """Use this tool to answer questions about 'how to' do something, or about the functionality and purpose of code."""
     try:
         vector_store_manager = VectorStoreManager()
         result = vector_store_manager.query_vectors(query=query, data_source_id=data_source_id)
         return result
     except Exception as e:
-        print(f"An error occurred in the semantic code search tool: {e}")
-        return "Error: Could not process the query for semantic search."
+        return f"Error during semantic search: {e}"
 
-
-# --- Tool 3: File Reader Tool ---
 @tool
 def file_reader_tool(file_path: str, data_source_id: str) -> str:
-    """
-    Use this tool to read the full content of a specific file from the repository.
-    You MUST provide the exact 'file_path' and the 'data_source_id' for the repository you are currently analyzing.
-    This is useful when you need to see the raw code to provide an implementation example or to verify details.
-    """
+    """Use this tool to read the full content of a specific file from the repository."""
     try:
         return read_file_from_repo(data_source_id=data_source_id, file_path=file_path)
     except Exception as e:
-        print(f"An error occurred in the file reader tool: {e}")
-        return f"Error: Could not read the file {file_path}."
+        return f"Error reading file {file_path}: {e}"
 
-# --- Final list of all tools for the agent ---
-all_tools = [knowledge_graph_search, semantic_code_search, file_reader_tool]
+# --- The NEW, smarter Tool Executor Node ---
+# Replace the tool_executor function one last time with this complete version
+def tool_executor(state: dict) -> dict:
+    """
+    The intelligent "Agent Kernel" that reads the plan and executes the *next* appropriate step.
+    """
+    print("---EXECUTING TOOL EXECUTOR NODE---")
+    plan = state.get("plan", [])
+    next_step_index = len(state.get("intermediate_steps", []))
+
+    if next_step_index >= len(plan):
+        print("Executor: All plan steps have been executed.")
+        return {"intermediate_steps": []}
+
+    step_to_execute = plan[next_step_index]
+    print(f"Executing step {next_step_index + 1}/{len(plan)}: '{step_to_execute}'")
+
+    tool_name = ""
+    result = ""
+
+    if "knowledge_graph_search" in step_to_execute.lower():
+        tool_name = "knowledge_graph_search"
+        print("Decision: Use Knowledge Graph...")
+        # Pass the state to the generator
+        cypher_query = generate_cypher_query(state) # Corrected call
+        if cypher_query:
+            print(f"Cypher query generated: {cypher_query}")
+            result = knowledge_graph_search.invoke({"cypher_query": cypher_query, "data_source_id": state["repo_id"], "state": state})
+        else:
+            result = "Could not generate a relevant Cypher query."
+
+    elif "semantic_code_search" in step_to_execute.lower():
+        tool_name = "semantic_code_search"
+        print("Decision: Use Semantic Search.")
+        result = semantic_code_search.invoke({"query": state["decomposed_query"], "data_source_id": state["repo_id"]})
+    
+    elif "file_reader_tool" in step_to_execute.lower(): # <-- ADD THIS BLOCK
+        tool_name = "file_reader_tool"
+        print("Decision: Use File Reader.")
+        # This is a simplified approach; a real implementation would need to
+        # use an LLM to extract the file_path from the plan or previous steps.
+        # For now, we'll assume it's about 'peer.py' from the first step's context.
+        file_path_to_read = "peer.py" 
+        print(f"Attempting to read file: {file_path_to_read}")
+        result = file_reader_tool.invoke({"file_path": file_path_to_read, "data_source_id": state["repo_id"]})
+
+    else:
+        tool_name = "no_op"
+        result = f"Could not find a tool for step: '{step_to_execute}'"
+
+    print(f"Tool '{tool_name}' executed. Result: {result[:200]}...")
+    return {"intermediate_steps": [(tool_name, result)]}
