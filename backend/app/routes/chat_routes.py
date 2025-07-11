@@ -272,3 +272,40 @@ def chat_handler(current_user_identity):
     except Exception as e:
         current_app.logger.error(f"A critical error occurred with the AI agent: {e}", exc_info=True)
         return jsonify({"error": f"An error occurred with the AI agent: {str(e)}"}), 502
+    
+@chat_bp.route('/history/<session_id>/', methods=['DELETE'])
+@token_required
+def clear_chat_history(current_user_identity, session_id):
+    """
+    Deletes all chat history messages for a given session, repo, and user.
+    """
+    data_source_id = request.args.get('repo_id')
+
+    if not data_source_id:
+        return jsonify({"error": "Missing repo_id query parameter."}), 400
+
+    user = db.session.query(AdminUser).filter_by(username=current_user_identity).first()
+    if not user:
+        current_app.logger.error(f"Authenticated user '{current_user_identity}' not found for history deletion.")
+        return jsonify({"error": "User not found."}), 404
+
+    current_app.logger.info(f"Attempting to delete chat history for session '{session_id}' in repo '{data_source_id}' by user '{user.username}'.")
+
+    try:
+        # This is the most efficient way to delete multiple rows without loading them into memory.
+        # It creates a single DELETE statement.
+        num_deleted = db.session.query(ChatHistory).filter_by(
+            session_id=session_id,
+            user_id=user.id,
+            data_source_id=data_source_id
+        ).delete(synchronize_session=False) # 'fetch' is the default and can be slow
+
+        db.session.commit()
+        
+        current_app.logger.info(f"Successfully deleted {num_deleted} messages.")
+        return jsonify({"message": f"Successfully cleared chat history. {num_deleted} messages deleted."}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error clearing chat history for session {session_id}: {e}", exc_info=True)
+        return jsonify({"error": "A server error occurred while clearing chat history.", "details": str(e)}), 500
