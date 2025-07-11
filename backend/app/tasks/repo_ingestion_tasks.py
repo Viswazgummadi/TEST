@@ -4,8 +4,10 @@ import shutil
 import git
 from datetime import datetime
 from flask import current_app
-from .. import celery_app
-from ..models.models import db, DataSource
+from backend.app import db # db is from backend.app (global instance)
+from backend.celery_worker import celery_app # Import celery_app from where it's defined and configured
+
+from ..models.models import DataSource
 from ..knowledge_graph.kg_manager import KnowledgeGraphManager
 from ..code_parser.python_parser import parse_python_file
 from ..vector_db.vector_store_manager import VectorStoreManager

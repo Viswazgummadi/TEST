@@ -4,7 +4,7 @@ import { useAdmin } from "../context/AdminContext";
 import { FiShare2, FiCopy, FiCheck } from "react-icons/fi";
 import { MdPerson } from "react-icons/md";
 import { RiRobot2Fill } from "react-icons/ri";
-import { useState } from "react";
+import { useState, Children } from "react";
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -102,7 +102,14 @@ const MessageBubble = ({ message }) => {
     const blockId = `cb-${codeBlockIndexCounter++}`;
 
     return (
-      <div className="relative group my-2 text-sm">
+      <pre
+        className="relative group my-2 text-sm"
+        style={{
+          padding: 0,
+          margin: 0,
+          overflow: 'auto'
+        }}
+      >
         <button
           onClick={() => handleCopy(codeString, blockId)}
           className="absolute top-2 right-2 p-1.5 bg-stone-700 hover:bg-stone-600 rounded text-xs text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity z-10"
@@ -126,9 +133,58 @@ const MessageBubble = ({ message }) => {
         >
           {codeString}
         </SyntaxHighlighter>
-      </div>
+      </pre>
     );
   };
+
+  // Helper to check if a node's child should be a block element
+  const isBlockNode = (childNode) => {
+    const blockNodeTypesOrTags = ['code', 'list', 'table', 'heading', 'blockquote', 'pre'];
+    return (childNode.type && blockNodeTypesOrTags.includes(childNode.type)) ||
+      (childNode.tagName && blockNodeTypesOrTags.includes(childNode.tagName));
+  };
+
+  // Custom Paragraph Renderer
+  const ParagraphRenderer = ({ node, children, ...props }) => {
+    // Check if any direct child node from the AST is a block-level element
+    const containsBlock = node.children.some(childNode => isBlockNode(childNode));
+
+    if (containsBlock) {
+      // If a block element is found, render children directly without wrapping in <p>
+      return <>{children}</>;
+    }
+
+    // Otherwise, render a normal paragraph with its default props
+    return <p {...props}>{children}</p>;
+  };
+
+  // Custom List Item Renderer
+  const ListItemRenderer = ({ node, children, ...props }) => {
+    // Check if any direct child node from the AST is a block-level element that should not be wrapped in <p>
+    // In many markdown parsers, content within an LI is implicitly a paragraph unless it's a block.
+    // By returning children directly if a block is found, we allow block elements to be direct children of <li>.
+    const containsBlock = node.children.some(childNode => isBlockNode(childNode));
+
+    if (containsBlock) {
+      return <li {...props}>{children}</li>;
+    }
+
+    // If it's just text or inline content, react-markdown might still wrap it in a <p>
+    // or keep it as inline. We can render a standard li.
+    // The inner content will be handled by the ParagraphRenderer if it generates a <p>.
+    return <li {...props}>{children}</li>;
+  };
+
+  // Custom Unordered List Renderer
+  const ListRenderer = ({ ordered, node, children, ...props }) => {
+    // Use the default render function for ul/ol but ensure it works with custom list items.
+    // The primary logic for unwrapping will be in the ListItemRenderer and ParagraphRenderer.
+    if (ordered) {
+      return <ol {...props}>{children}</ol>;
+    }
+    return <ul {...props}>{children}</ul>;
+  };
+
 
   let textToRender = message.text;
   if (typeof textToRender !== 'string') {
@@ -136,7 +192,7 @@ const MessageBubble = ({ message }) => {
   }
 
   if (author === "llm" && !message.isError) {
-    codeBlockIndexCounter = 0;
+    codeBlockIndexCounter = 0; // Reset for each new LLM message.
     textToRender = unwrapPotentialFullCodeBlock(textToRender);
   }
 
@@ -164,7 +220,13 @@ const MessageBubble = ({ message }) => {
                 prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-0">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  components={{ code: CodeBlockRenderer }}
+                  components={{
+                    code: CodeBlockRenderer,
+                    p: ParagraphRenderer,      // Custom paragraph renderer
+                    li: ListItemRenderer,      // Custom list item renderer
+                    ul: ListRenderer,          // Custom unordered list renderer
+                    ol: ListRenderer           // Custom ordered list renderer (reusing ListRenderer for simplicity)
+                  }}
                 >
                   {textToRender}
                 </ReactMarkdown>

@@ -6,9 +6,9 @@ import ConversationView from "../components/ConversationView";
 import { useSearchParams } from "react-router-dom";
 import createFetchApi from "../utils/api";
 import { v4 as uuidv4 } from 'uuid';
-import { useAdmin } from "../context/AdminContext"; // Import useAdmin to get the token
+import { useAdmin } from "../context/AdminContext";
 
-const CHAT_SESSION_KEY_PREFIX = "chatSession_"; // Prefix for localStorage key
+const CHAT_SESSION_KEY_PREFIX = "chatSession_";
 const AUTH_TOKEN_KEY = "adminToken"; // Use the same key as AdminContext
 
 const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
@@ -24,14 +24,12 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
   const initialDefaultModelId = "gemini-1.5-flash";
 
   const [chatSessionId, setChatSessionId] = useState(null);
-  const { token: authToken } = useAdmin(); // Get the token from AdminContext
+  const { token: authToken } = useAdmin();
 
-  // Pass authToken to createFetchApi
   const fetchApi = useMemo(() => createFetchApi(apiBaseUrl), [apiBaseUrl]);
 
   const isRepoSelected = !!selectedRepo;
 
-  // Effect for fetching models (existing logic)
   useEffect(() => {
     const getModels = async () => {
       setIsLoadingModels(true);
@@ -63,7 +61,6 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
     }
   }, [fetchApi, initialDefaultModelId, authToken]);
 
-  // Effect to handle URL source parameter (existing logic)
   useEffect(() => {
     const sourceIdFromUrl = searchParams.get('source');
     if (sourceIdFromUrl && dataSources.length > 0) {
@@ -75,16 +72,11 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
     }
   }, [searchParams, dataSources, selectedRepo, setRepoFilter, setSearchParams]);
 
-  // MODIFIED Effect: Manage chat session ID and load history
   useEffect(() => {
-    // If no repo is selected OR no auth token, clear local state but DO NOT clear localStorage keys.
-    // The localStorage keys should persist until explicitly managed (e.g., on logout).
     if (!isRepoSelected || !authToken) {
       setChatSessionId(null);
       setMessages([]);
       setPageState("initial");
-      // REMOVED: No longer indiscriminately clearing all chatSession_* keys here.
-      // They should persist in localStorage for when a repo is selected again.
       return;
     }
 
@@ -105,7 +97,6 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
         const historyResponse = await fetchApi(`/api/chat/history/${storedSessionId}/?repo_id=${selectedRepo}`, { token: authToken });
         if (historyResponse && historyResponse.length > 0) {
           const sortedMessages = historyResponse.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-          // Filter out system errors if they were temporary and not part of core history
           const filteredMessages = sortedMessages.filter(msg => msg.author !== 'system_error');
           setMessages(filteredMessages);
           setPageState("active_conversation");
@@ -120,8 +111,6 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
       }
     };
 
-    // If it's a new session for this specific repo, don't fetch history, just start fresh.
-    // If it's an existing session, fetch the history.
     if (!newSessionStarted) {
       fetchHistory();
     } else {
@@ -131,7 +120,6 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
 
   }, [isRepoSelected, selectedRepo, fetchApi, authToken]);
 
-  // Effect for scrolling to bottom (existing logic)
   useEffect(() => {
     if (
       pageState !== "initial" &&
@@ -147,8 +135,10 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
   }, [messages, pageState]);
 
   const handleSubmit = async (queryText) => {
+    console.log("handleSubmit called with query:", queryText); // LOG 1
     if (!queryText.trim()) {
       if (pageState === "processing") setPageState("active_conversation");
+      console.log("Query is empty or just whitespace. Aborting submission."); // LOG 2
       return;
     }
 
@@ -160,6 +150,7 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
       };
       setMessages((prev) => [...prev, authError]);
       setPageState("active_conversation");
+      console.log("Authentication token missing."); // LOG 3
       return;
     }
 
@@ -171,6 +162,7 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
       };
       setMessages((prev) => [...prev, repoNotSelectedError]);
       setPageState("active_conversation");
+      console.log("No repository selected."); // LOG 4
       return;
     }
 
@@ -182,17 +174,19 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
       };
       setMessages((prev) => [...prev, modelNotSelectedError]);
       setPageState("active_conversation");
+      console.log("No model selected."); // LOG 5
       return;
     }
 
     if (!chatSessionId) {
-      console.error("No chatSessionId available for submission.");
+      console.error("No chatSessionId available for submission. This should not happen if useEffect worked.");
       setMessages((prev) => [...prev, { id: `syserr-session-${Date.now()}`, text: "Error: Chat session not initialized.", author: "system_error" }]);
       setPageState("active_conversation");
       return;
     }
 
     setPageState("processing");
+    console.log("Page state set to 'processing'."); // LOG 6
 
     const newUserMessage = {
       id: `user-${Date.now()}`,
@@ -201,32 +195,39 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
     };
 
     setMessages((prevMessages) => {
-      if (
+      const updated = (
         pageState === "initial" ||
         (prevMessages.length > 0 &&
           prevMessages.every((m) => m.author === "system_error"))
-      ) {
-        return [newUserMessage];
-      }
-      return [...prevMessages, newUserMessage];
+      )
+        ? [newUserMessage]
+        : [...prevMessages, newUserMessage];
+      console.log("User message added to state:", newUserMessage); // LOG 7
+      return updated;
     });
 
     const aiMessageId = `llm-${Date.now()}`;
     currentAiMessageIdRef.current = aiMessageId;
+    console.log("AI message placeholder ID set:", aiMessageId); // LOG 8
 
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      {
-        id: aiMessageId,
-        text: "",
-        author: "llm",
-        isLoading: true,
-        traceUrl: undefined,
-        isError: false,
-      },
-    ]);
+    setMessages((prevMessages) => {
+      const updated = [
+        ...prevMessages,
+        {
+          id: aiMessageId,
+          text: "",
+          author: "llm",
+          isLoading: true,
+          traceUrl: undefined,
+          isError: false,
+        },
+      ];
+      console.log("AI message placeholder added to state."); // LOG 9
+      return updated;
+    });
 
     try {
+      console.log("Attempting fetch to backend chat endpoint..."); // LOG 10
       const response = await fetch(`${apiBaseUrl}/api/chat/`, {
         method: "POST",
         headers: {
@@ -240,6 +241,8 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
           session_id: chatSessionId,
         }),
       });
+      console.log("Fetch response received, status:", response.status, response.statusText); // LOG 11
+
       if (!response.ok) {
         let errorData = { error: `API Error: ${response.status} ${response.statusText}` };
         try {
@@ -262,6 +265,7 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
         );
         setPageState("active_conversation");
         currentAiMessageIdRef.current = null;
+        console.error("Backend response was not OK:", errorData); // LOG 12
         return;
       }
 
@@ -269,19 +273,22 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
         setMessages((prevMessages) =>
           prevMessages.map((msg) =>
             msg.id === currentAiMessageIdRef.current
-              ? { ...msg, text: "Error: Empty response from server.", isLoading: false, isError: true }
+              ? { ...msg, text: "Error: Empty response body from server.", isLoading: false, isError: true }
               : msg
           )
         );
         setPageState("active_conversation");
         currentAiMessageIdRef.current = null;
+        console.error("Empty response body from server."); // LOG 13
         return;
       }
 
+      console.log("Starting to read stream from response body..."); // LOG 14
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
 
       while (true) {
         const { value, done } = await reader.read();
+        console.log("Reader read:", { value, done }); // LOG 15 (important for raw stream chunks)
 
         if (done) {
           setMessages((prev) =>
@@ -289,24 +296,32 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
               msg.id === currentAiMessageIdRef.current ? { ...msg, isLoading: false } : msg
             )
           );
+          console.log("Stream completed. Finalizing AI message state."); // LOG 16
           break;
         }
 
         const eventLines = value.split('\n\n');
+        console.log("Split into event lines:", eventLines); // LOG 17
         for (const line of eventLines) {
           if (line.startsWith('data: ')) {
             const jsonData = line.substring('data: '.length);
+            console.log("Found data line, JSON data:", jsonData); // LOG 18
             if (jsonData.trim()) {
               try {
                 const parsedData = JSON.parse(jsonData);
-                if (parsedData.chunk) {
-                  setMessages((prev) =>
-                    prev.map((msg) =>
+                console.log("Parsed stream data:", parsedData); // LOG 19
+
+                if (parsedData.chunk !== undefined) { // Check for explicit undefined to allow empty string chunks if needed
+                  setMessages((prev) => {
+                    const updatedMessages = prev.map((msg) =>
                       msg.id === currentAiMessageIdRef.current
                         ? { ...msg, text: msg.text + parsedData.chunk }
                         : msg
-                    )
-                  );
+                    );
+                    // This console.log will show the current accumulated text
+                    console.log("AI message updated with chunk:", parsedData.chunk, "Current text:", updatedMessages.find(msg => msg.id === currentAiMessageIdRef.current)?.text); // LOG 20
+                    return updatedMessages;
+                  });
                 } else if (parsedData.error) {
                   setMessages((prev) =>
                     prev.map((msg) =>
@@ -320,6 +335,7 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
                         : msg
                     )
                   );
+                  console.error("Backend sent stream error:", parsedData.error); // LOG 21
                 } else if (parsedData.status === 'done') {
                   setMessages((prev) =>
                     prev.map((msg) =>
@@ -328,16 +344,19 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
                         : msg
                     )
                   );
+                  console.log("Backend sent stream status 'done'."); // LOG 22
                 }
               } catch (e) {
-                console.error('Error parsing JSON from stream chunk:', jsonData, e);
+                console.error('Error parsing JSON from stream chunk:', jsonData, e); // LOG 23
               }
             }
+          } else {
+            console.log("Non-data line received:", line); // LOG 24
           }
         }
       }
     } catch (error) {
-      console.error("Chat submission or streaming error:", error);
+      console.error("Chat submission or streaming error:", error); // LOG 25
       setMessages((prevMessages) => {
         const aiMessageExists = prevMessages.some(msg => msg.id === currentAiMessageIdRef.current);
         if (aiMessageExists) {
@@ -369,6 +388,7 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
       if (currentAiMessageIdRef.current) {
         currentAiMessageIdRef.current = null;
       }
+      console.log("Chat submission process finished (finally block). Page state set to 'active_conversation'."); // LOG 26
     }
   };
 

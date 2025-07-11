@@ -5,7 +5,7 @@ from flask_cors import CORS
 from ..models import db, DataSource
 from ..utils.auth import token_required
 from ..tasks.repo_ingestion_tasks import process_data_source_for_ai # Import the Celery task
-from .. import celery_app # Import the celery_app instance for checking task status
+from backend.celery_worker  import celery_app # Import the celery_app instance for checking task status
 
 data_source_bp = Blueprint('data_source_api_routes', __name__,url_prefix='/api/data-sources')
 CORS(data_source_bp, supports_credentials=True)

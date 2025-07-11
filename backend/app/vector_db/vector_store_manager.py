@@ -4,6 +4,9 @@ import json
 from pinecone import Pinecone
 from flask import current_app
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+# CHANGED: from app.models.models import ... to from ..models.models import ...
+# This import style uses relative pathing, which is generally more robust within a package.
+from ..models.models import db, ConfiguredModel, APIKey, AdminUser, RepoConversationSummary, UserFact, ChatHistory
 
 class VectorStoreManager:
     """Manages all interactions with the Pinecone Vector Database and Gemini Embedding API."""
@@ -16,13 +19,10 @@ class VectorStoreManager:
         if not gemini_api_key:
             raise ValueError("Gemini API Key is not configured.")
 
-        # Initialize Pinecone client (works for Serverless)
         self.pinecone = Pinecone(api_key=pinecone_api_key)
         self.index_name = index_name
         
-        # Configure Gemini for API calls
         self.embedding_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=gemini_api_key)
-        # NEW: Initialize the chat model via LangChain for docstring generation
         self.chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, google_api_key=gemini_api_key)
 
     def get_index(self):
@@ -30,7 +30,7 @@ class VectorStoreManager:
         if self.index_name not in self.pinecone.list_indexes().names():
             raise ValueError(f"Pinecone index '{self.index_name}' does not exist. Please create it in the Pinecone dashboard.")
         return self.pinecone.Index(self.index_name)
-    # --- THIS IS THE NEW METHOD FOR OUR AI TOOL ---
+
     def query_vectors(self, query: str, data_source_id: str, top_k: int = 5) -> str:
         """
         Takes a natural language query, embeds it, and queries Pinecone to find the
@@ -40,32 +40,25 @@ class VectorStoreManager:
         try:
             index = self.get_index()
             
-            # 1. Embed the user's query using the same model we used for the documents.
-            query_vector = self.embedding_model.embed_query(query) # Use the initialized model
+            query_vector = self.embedding_model.embed_query(query)
 
-
-            # 2. Query Pinecone for the most similar vectors within the specified namespace.
             query_results = index.query(
                 namespace=data_source_id,
                 vector=query_vector,
                 top_k=top_k,
-                include_metadata=True # We need the metadata to know which function was found
+                include_metadata=True
             )
 
-            # 3. Format the results into a readable string for the AI agent.
             if not query_results['matches']:
                 return "No relevant functions found in the vector database."
 
             context_str = "Found relevant functions:\n\n"
             for match in query_results['matches']:
-                # The original text is not stored in Pinecone, so we reconstruct it from metadata.
                 metadata = match['metadata']
                 context_str += (
                     f"--- Function: {metadata.get('function_name', 'N/A')} ---\n"
                     f"File: {metadata.get('file_path', 'N/A')}\n"
                     f"Similarity Score: {match['score']:.4f}\n"
-                    # We can add the text back here if we store it in metadata
-                    # f"Documentation:\n{metadata.get('text', 'N/A')}\n\n"
                 )
 
             current_app.logger.info(f"VDB Tool: Found {len(query_results['matches'])} results.")
@@ -74,6 +67,7 @@ class VectorStoreManager:
         except Exception as e:
             current_app.logger.error(f"Error querying vector database: {e}", exc_info=True)
             return "There was an error while querying the vector database."
+
     def generate_docstrings_in_batch(self, functions_to_document: list[dict]) -> list[str]:
         """
         Uses a Gemini chat model to generate docstrings for a batch of functions that lack them.
@@ -81,7 +75,6 @@ class VectorStoreManager:
         if not functions_to_document:
             return []
 
-        # This complex prompt instructs the LLM to behave exactly as we need.
         prompt = """
 You are an expert Python programmer tasked with writing concise, accurate, one-line docstrings.
 Analyze the following Python functions and generate a single-line docstring for each, explaining its core purpose based *only* on the provided code.
@@ -106,11 +99,8 @@ Now, generate docstrings for this list of functions:
         full_prompt = prompt + json.dumps(prompt_payload, indent=2)
 
         try:
-    # Use the already initialized LangChain chat model for docstring generation
-    # For a single prompt, use .invoke()
-            response = self.chat_model.invoke(full_prompt) # Use the initialized chat_model
+            response = self.chat_model.invoke(full_prompt)
             
-            # Clean the response to ensure it's valid JSON
             cleaned_response = response.content.strip().replace("```json", "").replace("```", "").strip()
             generated_docstrings = json.loads(cleaned_response)
 
@@ -119,7 +109,6 @@ Now, generate docstrings for this list of functions:
                 return generated_docstrings
             else:
                 current_app.logger.error("AI response for docstrings was not a valid list or had an incorrect length.")
-                # Return a placeholder so the process doesn't crash
                 return ["# AI-generated docstring failed: Invalid format." for _ in functions_to_document]
 
         except Exception as e:
@@ -144,16 +133,14 @@ Now, generate docstrings for this list of functions:
             current_app.logger.info(f"Processing embedding batch {i // batch_size + 1} with {len(batch_texts)} items...")
 
             try:
-                embeddings = self.embedding_model.embed_documents(batch_texts) # Use the initialized model
+                embeddings = self.embedding_model.embed_documents(batch_texts)
             except Exception as e:
                 current_app.logger.error(f"Error calling Gemini Embedding API for batch {i // batch_size + 1}: {e}")
-                continue # Skip this batch if embedding fails
+                continue
 
-            # Prepare data for Pinecone
             vectors_to_upsert = []
             for j, embedding in enumerate(embeddings):
                 metadata = batch_metadatas[j]
-                # Create a unique and descriptive ID for each vector
                 vector_id = f"{data_source_id}:{metadata['file_path']}:{metadata['function_name']}"
                 vectors_to_upsert.append({
                     "id": vector_id,
@@ -161,11 +148,9 @@ Now, generate docstrings for this list of functions:
                     "metadata": metadata
                 })
 
-            # Upsert the vectors into the correct Pinecone namespace
             if vectors_to_upsert:
                 index.upsert(vectors=vectors_to_upsert, namespace=data_source_id)
             
-            # Throttle the requests to respect API rate limits
             current_app.logger.info(f"Batch complete. Waiting for {delay} seconds...")
             time.sleep(delay)
 

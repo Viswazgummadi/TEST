@@ -144,3 +144,65 @@ class ChatHistory(db.Model):
             'author': self.sender,       # 'author' to match frontend's 'message.author'
             'timestamp': self.timestamp.isoformat()
         }
+        
+class RepoConversationSummary(db.Model):
+    """
+    Stores a consolidated summary of a user's conversation history for a specific data source.
+    This acts as a mid-term memory for context switching between repos.
+    """
+    __tablename__ = 'repo_conversation_summaries'
+
+    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
+    data_source_id = db.Column(db.String, db.ForeignKey('data_sources.id'), nullable=False)
+    summary_text = db.Column(db.Text, nullable=True, default="") # Stores the evolving summary
+    
+    # This timestamp marks up to which point in the chat history the summary is valid.
+    # It helps the summarization task know which new messages to process.
+    last_message_timestamp = db.Column(db.DateTime, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Ensure only one summary per user per data source
+    __table_args__ = (db.UniqueConstraint('user_id', 'data_source_id', name='_user_data_source_uc'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'data_source_id': self.data_source_id,
+            'summary_text': self.summary_text,
+            'last_message_timestamp': self.last_message_timestamp.isoformat() if self.last_message_timestamp else None,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
+
+# --- NEW MODEL FOR USER-SPECIFIC GENERAL FACTS (Layer 3) ---
+class UserFact(db.Model):
+    """
+    Stores general facts or preferences about a user that are relevant across all data sources.
+    This acts as a long-term personal memory.
+    """
+    __tablename__ = 'user_facts'
+
+    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
+    fact_key = db.Column(db.String(255), nullable=False)   # e.g., 'user_name', 'preferred_language'
+    fact_value = db.Column(db.Text, nullable=False)        # e.g., 'Viswaz', 'Python'
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Ensure only one value per fact key per user
+    __table_args__ = (db.UniqueConstraint('user_id', 'fact_key', name='_user_fact_key_uc'),)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'fact_key': self.fact_key,
+            'fact_value': self.fact_value,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }

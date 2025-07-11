@@ -2,12 +2,12 @@
 import datetime
 import jwt
 from functools import wraps
-from flask import request, jsonify, current_app, g # Import g
+from flask import request, jsonify, current_app, g
 from cryptography.fernet import InvalidToken as FernetInvalidToken
 
-# Import models relative to the 'app' package
-from ..models.models import AdminUser 
-# fernet_cipher will be accessed via current_app.fernet_cipher
+# CHANGED: from backend.app.models.models import AdminUser to from ..models.models import AdminUser
+from ..models.models import AdminUser
+# CHANGED: from backend.app import db to from .. import db
 from .. import db # Ensure db is imported correctly
 
 def encrypt_value(value: str) -> str | None:
@@ -42,7 +42,10 @@ def token_required(f):
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Bearer '):
             try:
-                token = auth_header.split(" ")[1]
+                # This needs to be token = auth_header.split(" ")[1] if it was just "Bearer abc"
+                # If it was token = auth_header.split(" ") and you were expecting token[1] then that was fine
+                # Reverting to what was likely the original working form for a Bearer token
+                token = auth_header.split(" ")[1] 
             except IndexError:
                 current_app.logger.warning("Bearer token malformed.")
                 return jsonify({'message': 'Bearer token malformed'}), 401
@@ -61,7 +64,6 @@ def token_required(f):
                 current_app.logger.warning(f"User '{data['sub']}' specified in token not found.")
                 raise jwt.InvalidTokenError("User specified in token not found.")
             
-            # Store the user object in Flask's global request context (g) for easy access
             g.current_user = admin_user
             current_user_identity = admin_user.username 
             

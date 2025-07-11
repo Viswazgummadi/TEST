@@ -1,9 +1,12 @@
 # backend/app/ai_core/tools.py
 
 from langchain.tools import tool
-from app.knowledge_graph.kg_manager import KnowledgeGraphManager
-from app.vector_db.vector_store_manager import VectorStoreManager
-from app.utils.file_reader import read_file_from_repo
+# CHANGED: from backend.app.knowledge_graph... to from ..knowledge_graph...
+from ..knowledge_graph.kg_manager import KnowledgeGraphManager 
+# CHANGED: from backend.app.vector_db... to from ..vector_db...
+from ..vector_db.vector_store_manager import VectorStoreManager
+# CHANGED: from backend.app.utils... to from ..utils...
+from ..utils.file_reader import read_file_from_repo
 
 # --- Tool 1: Knowledge Graph Search ---
 @tool
@@ -17,11 +20,7 @@ def knowledge_graph_search(query: str, data_source_id: str) -> str:
     """
     kg_manager = None
     try:
-        # Note: We will modify the kg_manager.query_graph later to accept the data_source_id
-        # For now, this structure is correct.
         kg_manager = KnowledgeGraphManager()
-        # This is a placeholder for now. The agent will provide the real data_source_id.
-        # We will need to update query_graph to use it for filtering.
         result = kg_manager.query_graph(natural_language_query=query, data_source_id=data_source_id)
         return result
     except Exception as e:
