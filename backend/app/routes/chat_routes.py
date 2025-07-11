@@ -225,12 +225,21 @@ def chat_handler(current_user_identity):
         def generate_stream_chunks():
             nonlocal ai_response_chunks
             try:
-                for char in full_ai_response_content:
-                    ai_response_chunks.append(char)
-                    data_payload = json.dumps({"chunk": char})
+                ai_response_chunks = [full_ai_response_content]
+
+                # Send the entire response as one single data chunk.
+                if full_ai_response_content:
+                    # The key is still 'chunk', but the value is the whole answer.
+                    data_payload = json.dumps({"chunk": full_ai_response_content})
                     yield f"data: {data_payload}\n\n".encode('utf-8')
-                    time.sleep(0.02)
+
+                # We still send the 'done' status so the frontend knows to stop listening.
                 yield f"data: {json.dumps({'status': 'done'})}\n\n".encode('utf-8')
+            except Exception as e:
+                current_app.logger.error(f"Error during streaming simulation: {e}", exc_info=True)
+                error_payload = json.dumps({"error": f"Stream generation error: {str(e)}"})
+                yield f"data: {error_payload}\n\n".encode('utf-8')
+                ai_response_chunks = [f"Error: {str(e)}"]
             finally:
                 if ai_response_chunks:
                     final_save_content = "".join(ai_response_chunks)
