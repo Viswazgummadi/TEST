@@ -7,6 +7,8 @@ import { useSearchParams } from "react-router-dom";
 import createFetchApi from "../utils/api";
 import { v4 as uuidv4 } from 'uuid';
 import { useAdmin } from "../context/AdminContext";
+// --- ADD THIS LINE ---
+import { FiTrash2 } from "react-icons/fi";
 
 const CHAT_SESSION_KEY_PREFIX = "chatSession_";
 const AUTH_TOKEN_KEY = "adminToken"; // Use the same key as AdminContext
@@ -391,7 +393,44 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
       console.log("Chat submission process finished (finally block). Page state set to 'active_conversation'."); // LOG 26
     }
   };
+  const handleClearHistory = async () => {
+    if (!isRepoSelected || !chatSessionId || !authToken) {
+      console.error("Cannot clear history: missing repo, session, or auth token.");
+      return;
+    }
 
+    console.log("Attempting to clear chat history...");
+    // You can optionally set a new pageState here, e.g., setPageState("clearing_history");
+
+    try {
+      // Use the existing fetchApi helper, just specify the DELETE method.
+      // We don't need to parse a JSON response, we just care if it was successful.
+      await fetch(`${apiBaseUrl}/api/chat/history/${chatSessionId}/?repo_id=${selectedRepo}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      console.log("History cleared successfully on the backend.");
+
+      // Reset the frontend state to match
+      setMessages([]);
+      setPageState("initial");
+
+    } catch (err) {
+      console.error("Failed to clear chat history:", err);
+      // Optionally, show an error message to the user
+      setMessages(prev => [...prev, {
+        id: `syserr-clear-${Date.now()}`,
+        text: `Error: Could not clear chat history. ${err.message}`,
+        author: 'system_error'
+      }]);
+    } finally {
+      // If you set a "clearing_history" state, reset it here.
+      // e.g., if (pageState === "clearing_history") setPageState("active_conversation");
+    }
+  };
   const isChatInputDisabled = pageState === "processing";
   const showInitialPromptContent =
     pageState === "initial" &&
@@ -457,10 +496,30 @@ const ChatPage = ({ selectedRepo, setRepoFilter, dataSources, apiBaseUrl }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div
-              ref={scrollContainerRef}
-              className="flex-1 overflow-y-auto min-h-0 custom-scrollbar"
-            >
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto min-h-0 custom-scrollbar"
+              >
+                {/* --- ADD THIS NEW BLOCK FOR THE BUTTON --- */}
+                <AnimatePresence>
+                  {messages.length > 0 && !showInitialPromptContent && (
+                    <motion.div
+                      className="flex justify-end pr-4 pt-2"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <button
+                        onClick={handleClearHistory}
+                        disabled={isChatInputDisabled}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 bg-red-500/10 rounded-md hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        title="Clear this conversation"
+                      >
+                        <FiTrash2 />
+                        Clear Chat
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               <div className="w-full">
                 <ConversationView messages={messages} />
               </div>
