@@ -4,7 +4,14 @@ reploit/
 │   ├── app/
 │   │   ├── ai_core/
 │   │   │   ├── agent.py
-│   │   │   └── tools.py
+│   │   │   ├── critic.py
+│   │   │   ├── cypher_query.py
+│   │   │   ├── graph.py
+│   │   │   ├── planner.py
+│   │   │   ├── retrieval_grader.py
+│   │   │   ├── synthesizer.py
+│   │   │   ├── tools.py
+│   │   │   └── tools_generator.py
 │   │   ├── code_parse/
 │   │   │   └── python_parser.py
 │   │   ├── core_config/
@@ -23,10 +30,12 @@ reploit/
 │   │   │   ├── github_routes.py
 │   │   │   └── google_routes.py
 │   │   ├── tasks/
-│   │   │   └── repo_ingestion_task.py
+│   │   │   ├── memory_tasks.py
+│   │   │   └── repo_ingestion_tasks.py
 │   │   ├── utils/
-│   │   │   └── auth.py
-│   │   │   └── file_reader.py
+│   │   │   ├── auth.py
+│   │   │   ├── file_reader.py
+│   │   │   └── llm_utils.py
 │   │   └── vector_db/
 │   │       └── vector_store_manager.py
 │   ├── celery_worker.py

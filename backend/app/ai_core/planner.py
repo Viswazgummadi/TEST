@@ -5,14 +5,21 @@ from ..utils.llm_utils import get_llm_for_graph # We will create this helper fun
 
 # --- 1. Define the Planner's Prompt (Corrected Version) ---
 PLANNER_PROMPT = """
-You are an expert AI agent system planner. Your role is to analyze a user's query and the conversation history to create a clear, actionable plan for your internal agent team.
+You are an expert AI agent system planner. Your role is to analyze a user's query and create the simplest possible plan.
 
-1.  **Decompose the Query:** First, rewrite the user's latest query into a clear, standalone, and "decomposed" question. This question should be optimized for retrieval systems. For example, if the user asks "what about that celery thing?", you should rewrite it to something like "Analyze the Celery configuration and task execution flow in the repository."
+**Core Instruction:**
+Your primary goal is to DELEGATE the hard work to your specialist tools, not to create a complex multi-step plan yourself. For almost any question about the codebase, the plan should be a SINGLE step: to use the knowledge graph.
 
-2.  **Create a Plan:** Second, create a step-by-step plan to answer the decomposed query. The plan should be a list of simple instructions for your agent team. Focus on which tools to use. The available tools are:
-    *   `knowledge_graph_search`: For questions about code structure, definitions, and relationships (e.g., "What functions call X?", "Where is Y defined?").
-    *   `semantic_code_search`: For questions about code purpose, functionality, or "how-to" guides (e.g., "How does authentication work?").
-    *   `file_reader_tool`: To read the entire content of a specific file.
+1.  **Decompose the Query:** Rewrite the user's latest query into a clear, standalone, and "decomposed" question for the tools.
+
+2.  **Create a Plan:** Create a step-by-step plan.
+    - If the user is asking a question about the code, the plan MUST be a single step:
+      `"Use 'knowledge_graph_search' to answer the user's question."`
+    - Only if the user explicitly asks to "read the contents of file X.py" should you use the `file_reader_tool`.
+
+**Available Tools:**
+*   `knowledge_graph_search`: The primary tool for ALL questions about code, structure, relationships, or functionality.
+*   `file_reader_tool`: Use only when specifically asked to read a file.
 
 **User's Query:**
 {query}
@@ -21,20 +28,16 @@ You are an expert AI agent system planner. Your role is to analyze a user's quer
 {chat_history}
 
 **Your Response:**
-You MUST provide your response as a single, valid JSON object with two keys: "decomposed_query" and "plan".
-The "plan" must be a list of strings.
+You MUST provide your response as a single, valid JSON object with "decomposed_query" and "plan" keys.
 
-**Example Response:**
+**Example for a code question:**
 {{
-  "decomposed_query": "Find the definition of the `UserFact` model and determine how it is used by the `generate_repo_summary_task` Celery task.",
+  "decomposed_query": "Explain the overall architecture of the project and its main components.",
   "plan": [
-    "Use 'knowledge_graph_search' to find the file path and definition of the `UserFact` model.",
-    "Use 'semantic_code_search' to find the implementation details of the `generate_repo_summary_task`.",
-    "Analyze the results of the previous steps to determine the relationship between the model and the task."
+    "Use 'knowledge_graph_search' to answer the user's question."
   ]
 }}
 """
-
 # --- 2. Create the Planner Node Function ---
 def planner_node(state: AgentState) -> dict:
     """

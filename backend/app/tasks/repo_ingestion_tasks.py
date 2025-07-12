@@ -44,70 +44,142 @@ def process_data_source_for_ai(self, data_source_id: str):
         git.Repo.clone_from(clone_url, local_repo_path)
         current_app.logger.info(f"✅ Cloning successful.")
         
-        # --- 3. Parsing & Data Preparation Phase ---
-        current_app.logger.info(f"Starting code parsing...")
-        all_functions_data = []
-        for root, _, files in os.walk(local_repo_path):
+        # --- 3. Parsing & Directory Graph Construction ---
+        current_app.logger.info("Phase 3: Starting AST parsing and directory graph construction...")
+        parsed_files = {}
+
+        for root, dirs, files in os.walk(local_repo_path, topdown=True):
             if any(d in root.split(os.sep) for d in ['.git', '__pycache__', 'node_modules', 'venv']):
                 continue
+            
+            relative_dir_path = os.path.relpath(root, local_repo_path)
+            if relative_dir_path == '.': # Ensure root directory is handled correctly
+                kg_manager.add_directory_node(data_source_id, relative_dir_path)
+
+            for dir_name in dirs:
+                relative_child_dir_path = os.path.join(relative_dir_path, dir_name)
+                kg_manager.add_directory_node(data_source_id, relative_child_dir_path)
+                kg_manager.link_directory_to_child(data_source_id, relative_dir_path, relative_child_dir_path, 'Directory')
+
             for file_name in files:
+                relative_file_path = os.path.relpath(os.path.join(root, file_name), local_repo_path)
+                kg_manager.add_file_node(data_source_id, relative_file_path)
+                kg_manager.link_directory_to_child(data_source_id, relative_dir_path, relative_file_path, 'File')
+
                 if file_name.endswith('.py'):
-                    file_path = os.path.join(root, file_name)
-                    relative_path = os.path.relpath(file_path, local_repo_path)
                     try:
-                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        with open(os.path.join(root, file_name), 'r', encoding='utf-8', errors='ignore') as f:
                             content = f.read()
                             parsed_data = parse_python_file(content)
-                            if parsed_data and parsed_data.get("functions"):
-                                for func_data in parsed_data["functions"]:
-                                    func_data["file_path"] = relative_path
-                                    all_functions_data.append(func_data)
+                            if parsed_data:
+                                parsed_files[relative_file_path] = parsed_data
                     except Exception as parse_error:
-                        current_app.logger.warning(f"Could not read or parse file {relative_path}: {parse_error}")
-        current_app.logger.info(f"✅ Finished parsing. Found {len(all_functions_data)} total functions.")
-
-        # --- 4. AI Docstring Generation Phase ---
-        functions_with_docstrings = [f for f in all_functions_data if f.get("docstring")]
-        functions_without_docstrings = [f for f in all_functions_data if not f.get("docstring")]
+                        current_app.logger.warning(f"Could not parse file {relative_file_path}: {parse_error}")
         
-        if current_app.config.get('ENABLE_AI_DOCSTRING_GENERATION') and functions_without_docstrings:
-            current_app.logger.info(f"Found {len(functions_without_docstrings)} functions without docstrings. Generating with AI...")
-            generated_docs = vector_store_manager.generate_docstrings_in_batch(functions_without_docstrings)
-            for i, func in enumerate(functions_without_docstrings):
-                func["docstring"] = generated_docs[i]
-        
-        final_functions_list = functions_with_docstrings + functions_without_docstrings
+        current_app.logger.info(f"✅ Phase 3 Complete. Parsed {len(parsed_files)} Python files.")
 
-        # --- 5. KG & Vector DB Population Phase ---
-        current_app.logger.info(f"Starting KG population and embedding data preparation...")
+
+        # --- 4. Deep Intelligence Graph Population (Two-Pass System) ---
+        current_app.logger.info("Phase 4: Starting Deep Intelligence graph population...")
+
+        # -- PASS 1: Create all nodes (Files, Classes, Functions) --
+        current_app.logger.info("  -> Pass 1: Creating nodes...")
+        for file_path, data in parsed_files.items():
+            # Create Class nodes
+            for class_data in data.get("classes", []):
+                kg_manager.add_class_node(
+                    data_source_id=data_source_id,
+                    file_path=file_path,
+                    class_name=class_data["name"],
+                    docstring=class_data["docstring"],
+                    base_classes=class_data["base_classes"]
+                )
+                # Create Method nodes (as functions linked to the class)
+                for method_data in class_data.get("methods", []):
+                    kg_manager.add_function_node(
+                        data_source_id=data_source_id,
+                        file_path=file_path,
+                        function_name=method_data["name"],
+                        docstring=method_data["docstring"],
+                        class_name=class_data["name"]
+                    )
+            # Create standalone Function nodes
+            for func_data in data.get("functions", []):
+                kg_manager.add_function_node(
+                    data_source_id=data_source_id,
+                    file_path=file_path,
+                    function_name=func_data["name"],
+                    docstring=func_data["docstring"]
+                )
+
+        # -- PASS 2: Create all relationships (Imports, Calls) --
+        current_app.logger.info("  -> Pass 2: Creating relationships...")
+        for file_path, data in parsed_files.items():
+            # Create IMPORT relationships
+            for imp in data.get("imports", []):
+                kg_manager.add_import_relationship(
+                    data_source_id=data_source_id,
+                    file_path=file_path,
+                    module=imp.get("module"),
+                    name=imp.get("name"),
+                    asname=imp.get("asname")
+                )
+            # Create CALLS relationships for standalone functions
+            for func_data in data.get("functions", []):
+                for call in func_data.get("calls", []):
+                    kg_manager.add_call_relationship(data_source_id, func_data["name"], file_path, call)
+            # Create CALLS relationships for methods within classes
+            for class_data in data.get("classes", []):
+                for method_data in class_data.get("methods", []):
+                    for call in method_data.get("calls", []):
+                        kg_manager.add_call_relationship(data_source_id, method_data["name"], file_path, call)
+        
+        current_app.logger.info("✅ Phase 4 Complete. Deep Intelligence graph populated.")
+
+        
+        # --- 5. Vector DB Population (Semantic Layer) ---
+        current_app.logger.info("Phase 5: Starting Vector DB population for semantic search...")
         text_chunks_for_embedding = []
         metadatas_for_embedding = []
-        for func_data in final_functions_list:
-            kg_manager.add_file_node(data_source_id, func_data["file_path"])
-            kg_manager.add_function_node(data_source_id, func_data["file_path"], func_data["name"])
-            
-            text_chunk = (
-                f"Function: {func_data['name']}\n"
-                f"File: {func_data['file_path']}\n"
-                f"Arguments: {', '.join(func_data['args']) if func_data['args'] else 'None'}\n"
-                f"Documentation:\n{func_data['docstring']}"
-            )
-            text_chunks_for_embedding.append(text_chunk)
-            metadatas_for_embedding.append({"file_path": func_data["file_path"], "function_name": func_data["name"]})
-        
+
+        for file_path, data in parsed_files.items():
+            # Add standalone functions
+            for func_data in data.get("functions", []):
+                text_chunk = (
+                    f"Function: {func_data['name']}\n"
+                    f"File: {file_path}\n"
+                    f"Arguments: {', '.join(func_data['args']) if func_data['args'] else 'None'}\n"
+                    f"Documentation:\n{func_data['docstring']}"
+                )
+                text_chunks_for_embedding.append(text_chunk)
+                metadatas_for_embedding.append({"file_path": file_path, "function_name": func_data["name"], "type": "function"})
+            # Add class methods
+            for class_data in data.get("classes", []):
+                 for method_data in class_data.get("methods", []):
+                    text_chunk = (
+                        f"Method: {class_data['name']}.{method_data['name']}\n"
+                        f"File: {file_path}\n"
+                        f"Arguments: {', '.join(method_data['args']) if method_data['args'] else 'None'}\n"
+                        f"Documentation:\n{method_data['docstring']}"
+                    )
+                    text_chunks_for_embedding.append(text_chunk)
+                    metadatas_for_embedding.append({"file_path": file_path, "function_name": method_data["name"], "type": "method", "class_name": class_data["name"]})
+
         if text_chunks_for_embedding:
+            current_app.logger.info(f"Generating embeddings for {len(text_chunks_for_embedding)} code chunks...")
             vector_store_manager.generate_and_store_embeddings(
                 text_chunks=text_chunks_for_embedding,
                 metadatas=metadatas_for_embedding,
                 data_source_id=data_source_id
             )
+        current_app.logger.info("✅ Phase 5 Complete. Vector DB populated.")
 
         # --- 6. Finalize and Update Status ---
         data_source.status = 'indexed'
         data_source.last_indexed_at = datetime.utcnow()
         db.session.add(data_source)
         db.session.commit()
-        current_app.logger.info(f"✅ Set data source {data_source_id} status to 'indexed'.")
+        current_app.logger.info(f"✅ Set data source {data_source_id} status to 'indexed'. All phases complete!")
         return {"status": "completed", "message": f"Data source {data_source.name} processed successfully."}
 
     except Exception as e:

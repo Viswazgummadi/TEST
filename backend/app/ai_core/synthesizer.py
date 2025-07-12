@@ -4,23 +4,25 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import AIMessage
 
 SYNTHESIZER_TEMPLATE = """
-You are an expert software engineering assistant. Your task is to provide a clear, concise, and helpful answer to a user's question based *only* on the provided context.
+You are an expert software architect and documentation writer. Your task is to provide a comprehensive, clear, and structured answer to a user's question by synthesizing the provided JSON context from a knowledge graph.
 
-User's Decomposed Query:
+**User's Query:**
 {query}
 
-Provided Context from Codebase Analysis:
+**Provided JSON Context from Codebase Analysis:**
+```json
 {context}
-
-Instructions:
-1. Carefully analyze the user's query and the provided context.
-2. Synthesize an answer that directly addresses the query.
-3. Base your answer strictly on the information within the provided context. Do not add any information or make any assumptions that are not explicitly supported by the context.
-4. If the context is empty or does not contain enough information to answer the query, inform the user that you couldn't find the necessary details in the codebase.
-5. Format your answer clearly using Markdown for readability (e.g., use code blocks for function names).
-
-Final Answer:
-"""
+```
+Your Instructions:
+Understand the Goal: Deeply analyze the "User's Query" to understand what the user truly wants to know.
+Synthesize the Context: The JSON context is a collection of results from multiple database queries. It may contain a function's summary, what it calls, who calls it, and what class it belongs to. Your job is to weave all of this information into a single, coherent, and easy-to-read response.
+Create a Structured Answer: Structure your answer using Markdown. Start with a high-level summary and then use bullet points to detail the key relationships you found in the context. A good structure would be:
+High-Level Summary: What is the primary role of the function/class?
+Execution Flow: Describe what it calls and what calls it.
+Contextual Placement: Mention the class it belongs to or the file it is in.
+Be Specific and Confident: Use the exact names of functions, classes, and files from the context. Do not be vague. You have been given the ground truth from the codebase; present it with confidence.
+Do Not State "Based on the provided context." The user knows the information comes from the context. Just present the facts as the answer.
+If the context is empty or uninformative, then and only then should you state that you could not find the relevant information."""
 
 SYNTHESIZER_PROMPT = ChatPromptTemplate.from_template(SYNTHESIZER_TEMPLATE)
 
